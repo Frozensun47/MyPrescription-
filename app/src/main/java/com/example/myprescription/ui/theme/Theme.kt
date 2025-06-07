@@ -15,7 +15,15 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import com.example.myprescription.R // This is for your project's resources
 private val AppDarkColorScheme = darkColorScheme(
     primary = BluePrimaryDark,
     onPrimary = BlueOnPrimaryDark,
@@ -97,5 +105,18 @@ fun MyPrescriptionTheme(
         colorScheme = colorScheme,
         typography = Typography,
         content = content
+    )
+}
+
+@Composable
+fun AppBarLogo(onLogoClick: () -> Unit = {}) {
+    Image(
+        painter = painterResource(id = R.mipmap.splash_screen_foreground), // Using the launcher icon as an example
+        contentDescription = "App Logo",
+        modifier = Modifier
+            .size(70.dp)
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .clickable(onClick = onLogoClick)
+            .padding(4.dp)
     )
 }

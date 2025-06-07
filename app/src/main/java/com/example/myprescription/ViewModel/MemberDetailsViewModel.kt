@@ -1,4 +1,4 @@
-package com.example.myprescription.viewmodel
+package com.example.myprescription.ViewModel
 
 import android.app.Application
 import android.content.Context
@@ -69,18 +69,18 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         }
     }
 
-    fun addPrescription(prescriptionData: Prescription) { // Removed imageUri from params, will be handled by updatePrescriptionWithImage
+    fun addPrescription(prescriptionData: Prescription) {
         viewModelScope.launch {
             val memberId = _currentMemberId.value ?: return@launch
-            val finalPrescription = prescriptionData.copy(memberId = memberId, imageUri = null) // Initially no image
+            val finalPrescription = prescriptionData.copy(memberId = memberId, imageUri = null)
             repository.insertPrescription(finalPrescription)
         }
     }
 
-    fun addReport(reportData: Report) { // Removed fileUri from params
+    fun addReport(reportData: Report) {
         viewModelScope.launch {
             val memberId = _currentMemberId.value ?: return@launch
-            val finalReport = reportData.copy(memberId = memberId, fileUri = null) // Initially no file
+            val finalReport = reportData.copy(memberId = memberId, fileUri = null)
             repository.insertReport(finalReport)
         }
     }
@@ -101,9 +101,7 @@ class MemberDetailsViewModel(application: Application, private val repository: A
 
             val imagePath = saveFileToInternalStorage(getApplication(), pickedImageUri, "prescription", targetId)
             if (imagePath != null) {
-                if (currentPrescription.imageUri != null && currentPrescription.imageUri != imagePath) {
-                    try { File(currentPrescription.imageUri).delete() } catch (e: Exception) { e.printStackTrace() }
-                }
+                currentPrescription.imageUri?.let { if (it != imagePath) File(it).delete() }
                 val updatedPrescription = currentPrescription.copy(imageUri = imagePath)
                 repository.updatePrescription(updatedPrescription)
             }
@@ -119,9 +117,7 @@ class MemberDetailsViewModel(application: Application, private val repository: A
 
             val filePath = saveFileToInternalStorage(getApplication(), pickedFileUri, "report", targetId)
             if (filePath != null) {
-                if (currentReport.fileUri != null && currentReport.fileUri != filePath) {
-                    try { File(currentReport.fileUri).delete() } catch (e: Exception) { e.printStackTrace() }
-                }
+                currentReport.fileUri?.let { if (it != filePath) File(it).delete() }
                 val updatedReport = currentReport.copy(fileUri = filePath)
                 repository.updateReport(updatedReport)
             }

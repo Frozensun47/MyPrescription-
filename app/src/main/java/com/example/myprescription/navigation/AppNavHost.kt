@@ -11,8 +11,8 @@ import androidx.navigation.navArgument
 import com.example.myprescription.ui.screens.FamilyMembersScreen
 import com.example.myprescription.ui.screens.MemberDetailsScreen
 import com.example.myprescription.ui.screens.ViewDocumentScreen
-import com.example.myprescription.viewmodel.FamilyViewModel
-import com.example.myprescription.viewmodel.MemberDetailsViewModel
+import com.example.myprescription.ViewModel.FamilyViewModel
+import com.example.myprescription.ViewModel.MemberDetailsViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets

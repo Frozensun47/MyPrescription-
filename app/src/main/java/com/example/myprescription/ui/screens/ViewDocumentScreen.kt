@@ -1,11 +1,14 @@
 package com.example.myprescription.ui.screens
 
+import android.content.ActivityNotFoundException
 import android.content.ContentValues
 import android.content.Context
-import android.graphics.Bitmap // Added import
+import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -18,8 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,10 +40,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import com.example.myprescription.R
-import com.example.myprescription.viewmodel.MemberDetailsViewModel
+import com.example.myprescription.ViewModel.MemberDetailsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -139,6 +145,57 @@ fun ViewDocumentScreen(
         }
     }
 
+    fun saveReportToDownloads(context: Context, reportPath: String, title: String) {
+        coroutineScope.launch {
+            try {
+                val file = File(reportPath)
+                if (!file.exists()) {
+                    Toast.makeText(context, "Source file not found!", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                val resolver = context.contentResolver
+                val downloadsCollection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                } else {
+                    // For older APIs, you might need to handle saving to Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    // and request WRITE_EXTERNAL_STORAGE permission. This implementation focuses on API 29+.
+                    Toast.makeText(context, "Downloads only supported on newer Android versions.", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, "$title-${System.currentTimeMillis()}.pdf")
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                        put(MediaStore.MediaColumns.IS_PENDING, 1)
+                    }
+                }
+
+                withContext(Dispatchers.IO) {
+                    resolver.insert(downloadsCollection, contentValues)?.let { uri ->
+                        resolver.openOutputStream(uri)?.use { outputStream ->
+                            FileInputStream(file).use { inputStream ->
+                                inputStream.copyTo(outputStream)
+                            }
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            contentValues.clear()
+                            contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                            resolver.update(uri, contentValues, null, null)
+                        }
+                    } ?: throw Exception("MediaStore insert for download failed.")
+                }
+                Toast.makeText(context, "Report saved to Downloads!", Toast.LENGTH_SHORT).show()
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(context, "Error saving report: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
 
     Scaffold(
         topBar = {
@@ -155,6 +212,13 @@ fun ViewDocumentScreen(
                             saveImageToGallery(context, displayableFile.absolutePath, documentTitle.replace(" ", "_"))
                         }) {
                             Icon(Icons.Filled.Download, contentDescription = "Download Image")
+                        }
+                    }
+                    if (documentType == "report" && displayableFile.exists()) {
+                        IconButton(onClick = {
+                            saveReportToDownloads(context, displayableFile.absolutePath, documentTitle.replace(" ", "_"))
+                        }) {
+                            Icon(Icons.Filled.Download, contentDescription = "Download Report")
                         }
                     }
                 },
@@ -214,28 +278,52 @@ fun ViewDocumentScreen(
                         }
                     }
                 } else {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(16.dp)
+                    ) {
                         Icon(
-                            imageVector = Icons.Filled.Warning,
-                            contentDescription = "File type not viewable",
+                            imageVector = Icons.AutoMirrored.Filled.InsertDriveFile,
+                            contentDescription = "Report File Icon",
                             modifier = Modifier.size(64.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "File preview not available for this type.",
+                            "This report is a file that needs to be opened with another app.",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 16.dp)
+                            textAlign = TextAlign.Center
                         )
-                        Text(
-                            "Filename: ${displayableFile.name}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(onClick = {
+                            try {
+                                val file = File(documentUriString)
+                                if (file.exists()) {
+                                    val authority = "${context.packageName}.provider"
+                                    val reportUri: Uri = FileProvider.getUriForFile(context, authority, file)
+
+                                    val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                                        setDataAndType(reportUri, "application/pdf")
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+                                    }
+                                    val chooser = Intent.createChooser(viewIntent, "Open Report with...")
+                                    context.startActivity(chooser)
+                                } else {
+                                    Toast.makeText(context, "File not found.", Toast.LENGTH_LONG).show()
+                                }
+                            } catch (e: ActivityNotFoundException) {
+                                Toast.makeText(context, "No application found to open PDF files.", Toast.LENGTH_LONG).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not open file: ${e.message}", Toast.LENGTH_LONG).show()
+                                e.printStackTrace()
+                            }
+                        }) {
+                            Icon(Icons.Filled.Visibility, contentDescription = "View")
+                            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                            Text("View Report")
+                        }
                     }
                 }
             }

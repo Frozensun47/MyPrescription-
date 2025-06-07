@@ -1,4 +1,4 @@
-package com.example.myprescription.viewmodel
+package com.example.myprescription.ViewModel
 
 import android.app.Application
 import android.content.Context

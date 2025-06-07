@@ -1,27 +1,17 @@
 package com.example.myprescription.model
 
 import androidx.room.Entity
-import androidx.room.ForeignKey
-import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.util.Date
-import java.util.UUID
 
-@Entity(
-    tableName = "reports",
-    foreignKeys = [ForeignKey(
-        entity = Member::class,
-        parentColumns = ["id"],
-        childColumns = ["memberId"],
-        onDelete = ForeignKey.CASCADE
-    )],
-    indices = [Index(value = ["memberId"])]
-)
+@Entity(tableName = "reports")
 data class Report(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val memberId: String, // Foreign key to Member
+    @PrimaryKey val id: String = java.util.UUID.randomUUID().toString(),
+    val memberId: String,
     val reportName: String,
-    val date: Date = Date(), // Will use TypeConverter
+    val date: Date,
     val notes: String? = null,
-    val fileUri: String? = null // Will store path to internal file
+    val fileUri: String? = null, // Path to the original file in internal storage
+    val mimeType: String? = null, // The MIME type of the original file
+    val previewImageUri: String? = null // Path to a generated image preview (for PDFs, etc.)
 )

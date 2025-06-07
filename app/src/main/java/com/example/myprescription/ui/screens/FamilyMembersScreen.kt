@@ -16,7 +16,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.* // Auto-import should catch specific icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,7 +36,8 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.myprescription.R
 import com.example.myprescription.model.Member
-import com.example.myprescription.viewmodel.FamilyViewModel
+import com.example.myprescription.ViewModel.FamilyViewModel
+import com.example.myprescription.ui.theme.AppBarLogo
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +54,9 @@ fun FamilyMembersScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Family Members", fontWeight = FontWeight.SemiBold) },
+                actions = {
+                    AppBarLogo()
+                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -72,19 +78,7 @@ fun FamilyMembersScreen(
                 .fillMaxSize()
                 .padding(horizontal = 8.dp)
         ) {
-            if (members.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "No family members added yet.\nClick 'Add Member' to get started.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 16.dp),
@@ -114,7 +108,7 @@ fun FamilyMembersScreen(
                     }
                 )
             }
-        }
+
     }
 }
 
@@ -149,6 +143,7 @@ fun MemberCard(
                             .data(imageModel)
                             .placeholder(R.drawable.ic_launcher_foreground)
                             .error(R.drawable.ic_launcher_foreground)
+                            .crossfade(true)
                             .build()
                     ),
                     contentDescription = "${member.name}'s profile photo",
@@ -176,12 +171,33 @@ fun MemberCard(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Row {
-                IconButton(onClick = onEditClick) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit Member", tint = MaterialTheme.colorScheme.secondary)
+
+            // --- IMPROVEMENT: More Options Menu ---
+            var showMenu by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = "More options")
                 }
-                IconButton(onClick = onDeleteClick) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete Member", tint = MaterialTheme.colorScheme.error)
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Edit") },
+                        onClick = {
+                            onEditClick()
+                            showMenu = false
+                        },
+                        leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        onClick = {
+                            onDeleteClick()
+                            showMenu = false
+                        },
+                        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) }
+                    )
                 }
             }
         }
@@ -199,12 +215,10 @@ fun AddEditMemberDialog(
     var ageString by remember { mutableStateOf(memberToEdit?.age?.toString() ?: "") }
     var relation by remember { mutableStateOf(memberToEdit?.relation ?: "") }
     var gender by remember { mutableStateOf(memberToEdit?.gender ?: "Male") }
-    var tempProfileImageUri by remember { mutableStateOf<Uri?>(null) } // Holds content URI from picker
-    // displayImage is what Coil should try to load (File path or new content URI)
+    var tempProfileImageUri by remember { mutableStateOf<Uri?>(null) }
     val displayImage: Any? = tempProfileImageUri ?: memberToEdit?.profileImageUri?.let {
         if (it.startsWith("content://")) Uri.parse(it) else File(it)
     }
-
 
     val genderOptions = listOf("Male", "Female", "Other")
     var expandedGenderDropdown by remember { mutableStateOf(false) }
@@ -248,7 +262,15 @@ fun AddEditMemberDialog(
                     fontWeight = FontWeight.Bold
                 )
 
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(bottom = 8.dp)) {
+                // --- IMPROVEMENT: Single Photo Picker Action ---
+                Box(
+                    modifier = Modifier
+                        .size(120.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clickable { profilePhotoPickerLauncher.launch("image/*") },
+                    contentAlignment = Alignment.Center
+                ) {
                     if (displayImage != null) {
                         Image(
                             painter = rememberAsyncImagePainter(
@@ -256,37 +278,29 @@ fun AddEditMemberDialog(
                                     .data(displayImage)
                                     .placeholder(R.drawable.ic_launcher_foreground)
                                     .error(R.drawable.ic_launcher_foreground)
+                                    .crossfade(true)
                                     .build()
                             ),
                             contentDescription = "Profile Photo",
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(100.dp)
-                                .clip(CircleShape)
-                                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                                .clickable { profilePhotoPickerLauncher.launch("image/*") }
+                            modifier = Modifier.fillMaxSize()
                         )
                     } else {
-                        Box(
-                            modifier = Modifier
-                                .size(100.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.secondaryContainer)
-                                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                                .clickable { profilePhotoPickerLauncher.launch("image/*") },
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 imageVector = Icons.Filled.AddAPhoto,
                                 contentDescription = "Add Profile Photo",
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                 modifier = Modifier.size(40.dp)
                             )
+                            Text(
+                                "Add Photo",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
                         }
                     }
-                }
-                TextButton(onClick = { profilePhotoPickerLauncher.launch("image/*") }) {
-                    Text(if (displayImage != null) "Change Photo" else "Add Photo")
                 }
 
                 OutlinedTextField(
@@ -303,9 +317,7 @@ fun AddEditMemberDialog(
                     onValueChange = { ageString = it.filter { char -> char.isDigit() }; ageError = null },
                     label = { Text("Age") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Number
-                    ),
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
                     isError = ageError != null,
                     supportingText = { if (ageError != null) Text(ageError!!) },
                     modifier = Modifier.fillMaxWidth()
@@ -363,9 +375,9 @@ fun AddEditMemberDialog(
                                 age = ageString.toInt(),
                                 relation = relation.trim(),
                                 gender = gender,
-                                profileImageUri = memberToEdit?.profileImageUri // Pass existing path, ViewModel handles new URI
+                                profileImageUri = memberToEdit?.profileImageUri
                             )
-                            onConfirm(memberData, tempProfileImageUri) // Pass the *picked* content URI
+                            onConfirm(memberData, tempProfileImageUri)
                         }
                     }) {
                         Text(if (memberToEdit == null) "Add Member" else "Save Changes")
