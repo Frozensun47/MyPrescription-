@@ -3,12 +3,15 @@ package com.example.myprescription.ui.screens
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,12 +34,13 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.myprescription.model.Prescription
 import com.example.myprescription.model.Report
 import com.example.myprescription.ViewModel.MemberDetailsViewModel
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MemberDetailsScreen(
     memberId: String,
@@ -55,7 +59,6 @@ fun MemberDetailsScreen(
     val editingReport by memberDetailsViewModel.editingReport.collectAsState()
     var itemToDelete by remember { mutableStateOf<Any?>(null) }
 
-
     val prescriptionImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
@@ -72,8 +75,9 @@ fun MemberDetailsScreen(
         memberDetailsViewModel.loadMemberData(memberId)
     }
 
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("Prescriptions", "Reports")
+    val pagerState = rememberPagerState(pageCount = { tabs.size })
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -86,48 +90,56 @@ fun MemberDetailsScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
-                    if (selectedTabIndex == 0) memberDetailsViewModel.onAddPrescriptionClicked()
+                    if (pagerState.currentPage == 0) memberDetailsViewModel.onAddPrescriptionClicked()
                     else memberDetailsViewModel.onAddReportClicked()
                 },
                 icon = { Icon(Icons.Filled.Add, "Add") },
-                text = { Text(if (selectedTabIndex == 0) "Add Prescription" else "Add Report") }
+                text = { Text(if (pagerState.currentPage == 0) "Add Prescription" else "Add Report") }
             )
         },
         floatingActionButtonPosition = FabPosition.Center
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            TabRow(selectedTabIndex = selectedTabIndex, containerColor = MaterialTheme.colorScheme.surfaceVariant) {
+            PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
-                        selected = selectedTabIndex == index,
-                        onClick = { selectedTabIndex = index },
-                        text = { Text(title, fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal) }
+                        selected = pagerState.currentPage == index,
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(index)
+                            }
+                        },
+                        text = { Text(title) }
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
 
-            when (selectedTabIndex) {
-                0 -> PrescriptionList(
-                    prescriptions = prescriptions,
-                    onUploadClick = {
-                        memberDetailsViewModel.setTargetPrescriptionForUpload(it.id)
-                        prescriptionImagePicker.launch("image/*")
-                    },
-                    onViewClick = { p -> p.imageUri?.let { onNavigateToViewDocument(p.id, it, "prescription", "Dr. ${p.doctorName}'s P.") } },
-                    onDeleteClick = { itemToDelete = it },
-                    onEditClick = { memberDetailsViewModel.onEditPrescriptionClicked(it) }
-                )
-                1 -> ReportList(
-                    reports = reports,
-                    onUploadClick = {
-                        memberDetailsViewModel.setTargetReportForUpload(it.id)
-                        reportFilePicker.launch("*/*")
-                    },
-                    onViewClick = { r -> r.fileUri?.let { onNavigateToViewDocument(r.id, it, "report", r.reportName) } },
-                    onDeleteClick = { itemToDelete = it },
-                    onEditClick = { memberDetailsViewModel.onEditReportClicked(it) }
-                )
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
+                    0 -> PrescriptionList(
+                        prescriptions = prescriptions,
+                        onUploadClick = {
+                            memberDetailsViewModel.setTargetPrescriptionForUpload(it.id)
+                            prescriptionImagePicker.launch("image/*")
+                        },
+                        onViewClick = { p -> p.imageUri?.let { onNavigateToViewDocument(p.id, it, "prescription", "Dr. ${p.doctorName}'s P.") } },
+                        onDeleteClick = { itemToDelete = it },
+                        onEditClick = { memberDetailsViewModel.onEditPrescriptionClicked(it) }
+                    )
+                    1 -> ReportList(
+                        reports = reports,
+                        onUploadClick = {
+                            memberDetailsViewModel.setTargetReportForUpload(it.id)
+                            reportFilePicker.launch("*/*")
+                        },
+                        onViewClick = { r -> r.fileUri?.let { onNavigateToViewDocument(r.id, it, "report", r.reportName) } },
+                        onDeleteClick = { itemToDelete = it },
+                        onEditClick = { memberDetailsViewModel.onEditReportClicked(it) }
+                    )
+                }
             }
         }
     }

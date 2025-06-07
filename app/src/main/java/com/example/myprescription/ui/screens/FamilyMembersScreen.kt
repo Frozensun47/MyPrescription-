@@ -17,8 +17,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,7 +35,6 @@ import coil.request.ImageRequest
 import com.example.myprescription.R
 import com.example.myprescription.model.Member
 import com.example.myprescription.ViewModel.FamilyViewModel
-import com.example.myprescription.ui.theme.AppBarLogo
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,14 +46,12 @@ fun FamilyMembersScreen(
     val members by familyViewModel.members.collectAsState()
     val showDialog by familyViewModel.showAddMemberDialog.collectAsState()
     val editingMember by familyViewModel.editingMember.collectAsState()
+    var memberToDelete by remember { mutableStateOf<Member?>(null) }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Family Members", fontWeight = FontWeight.SemiBold) },
-                actions = {
-                    AppBarLogo()
-                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -78,7 +73,19 @@ fun FamilyMembersScreen(
                 .fillMaxSize()
                 .padding(horizontal = 8.dp)
         ) {
-
+            if (members.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No family members added yet.\nClick 'Add Member' to get started.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 16.dp),
@@ -89,7 +96,7 @@ fun FamilyMembersScreen(
                             member = member,
                             onCardClick = { onNavigateToMemberDetails(member.id, member.name) },
                             onEditClick = { familyViewModel.onEditMemberClicked(member) },
-                            onDeleteClick = { familyViewModel.deleteMember(member) }
+                            onDeleteClick = { memberToDelete = member } // Set member to delete
                         )
                     }
                 }
@@ -109,6 +116,31 @@ fun FamilyMembersScreen(
                 )
             }
 
+            // Confirmation Dialog for deleting a member
+            if (memberToDelete != null) {
+                AlertDialog(
+                    onDismissRequest = { memberToDelete = null },
+                    title = { Text("Delete ${memberToDelete!!.name}?") },
+                    text = { Text("Are you sure? All of this member's prescriptions and reports will be permanently deleted.") },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                familyViewModel.deleteMember(memberToDelete!!)
+                                memberToDelete = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Text("Delete")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { memberToDelete = null }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+        }
     }
 }
 
@@ -143,7 +175,6 @@ fun MemberCard(
                             .data(imageModel)
                             .placeholder(R.drawable.ic_launcher_foreground)
                             .error(R.drawable.ic_launcher_foreground)
-                            .crossfade(true)
                             .build()
                     ),
                     contentDescription = "${member.name}'s profile photo",
@@ -171,33 +202,12 @@ fun MemberCard(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
-
-            // --- IMPROVEMENT: More Options Menu ---
-            var showMenu by remember { mutableStateOf(false) }
-            Box {
-                IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = "More options")
+            Row {
+                IconButton(onClick = onEditClick) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit Member", tint = MaterialTheme.colorScheme.secondary)
                 }
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Edit") },
-                        onClick = {
-                            onEditClick()
-                            showMenu = false
-                        },
-                        leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Delete") },
-                        onClick = {
-                            onDeleteClick()
-                            showMenu = false
-                        },
-                        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) }
-                    )
+                IconButton(onClick = onDeleteClick) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete Member", tint = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -233,7 +243,7 @@ fun AddEditMemberDialog(
         tempProfileImageUri = uri
     }
 
-    fun validateFields(): Boolean {
+    fun validateAndSave() {
         nameError = if (name.isBlank()) "Name cannot be empty" else null
         val ageNum = ageString.toIntOrNull()
         ageError = when {
@@ -243,145 +253,89 @@ fun AddEditMemberDialog(
             else -> null
         }
         relationError = if (relation.isBlank()) "Relation cannot be empty" else null
-        return nameError == null && ageError == null && relationError == null
+
+        if (nameError == null && ageError == null && relationError == null) {
+            val memberData = Member(
+                id = memberToEdit?.id ?: java.util.UUID.randomUUID().toString(),
+                name = name.trim(),
+                age = ageString.toInt(),
+                relation = relation.trim(),
+                gender = gender,
+                profileImageUri = memberToEdit?.profileImageUri
+            )
+            onConfirm(memberData, tempProfileImageUri)
+        }
     }
 
     Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = if (memberToEdit == null) "Add New Member" else "Edit Member",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-
-                // --- IMPROVEMENT: Single Photo Picker Action ---
+        Card(shape = RoundedCornerShape(16.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .clickable { profilePhotoPickerLauncher.launch("image/*") },
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                 ) {
-                    if (displayImage != null) {
-                        Image(
-                            painter = rememberAsyncImagePainter(
-                                ImageRequest.Builder(LocalContext.current)
-                                    .data(displayImage)
-                                    .placeholder(R.drawable.ic_launcher_foreground)
-                                    .error(R.drawable.ic_launcher_foreground)
-                                    .crossfade(true)
-                                    .build()
-                            ),
-                            contentDescription = "Profile Photo",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Filled.AddAPhoto,
-                                contentDescription = "Add Profile Photo",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(40.dp)
-                            )
-                            Text(
-                                "Add Photo",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
+                    Text(
+                        text = if (memberToEdit == null) "Add New Member" else "Edit Member",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
+                    IconButton(
+                        onClick = { validateAndSave() },
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = "Save Member", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
 
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it; nameError = null },
-                    label = { Text("Full Name") },
-                    singleLine = true,
-                    isError = nameError != null,
-                    supportingText = { if (nameError != null) Text(nameError!!) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = ageString,
-                    onValueChange = { ageString = it.filter { char -> char.isDigit() }; ageError = null },
-                    label = { Text("Age") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
-                    isError = ageError != null,
-                    supportingText = { if (ageError != null) Text(ageError!!) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = relation,
-                    onValueChange = { relation = it; relationError = null },
-                    label = { Text("Relation (e.g., Self, Spouse)") },
-                    singleLine = true,
-                    isError = relationError != null,
-                    supportingText = { if (relationError != null) Text(relationError!!) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                ExposedDropdownMenuBox(
-                    expanded = expandedGenderDropdown,
-                    onExpandedChange = { expandedGenderDropdown = !expandedGenderDropdown },
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    OutlinedTextField(
-                        value = gender,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Gender") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedGenderDropdown) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expandedGenderDropdown,
-                        onDismissRequest = { expandedGenderDropdown = false }
-                    ) {
-                        genderOptions.forEach { selectionOption ->
-                            DropdownMenuItem(
-                                text = { Text(selectionOption) },
-                                onClick = {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(bottom = 8.dp)) {
+                        if (displayImage != null) {
+                            Image(
+                                painter = rememberAsyncImagePainter(ImageRequest.Builder(LocalContext.current).data(displayImage).build()),
+                                contentDescription = "Profile Photo",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(100.dp).clip(CircleShape).clickable { profilePhotoPickerLauncher.launch("image/*") }
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.size(100.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer).clickable { profilePhotoPickerLauncher.launch("image/*") },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Filled.AddAPhoto, "Add Profile Photo", tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(40.dp))
+                            }
+                        }
+                    }
+                    TextButton(onClick = { profilePhotoPickerLauncher.launch("image/*") }) {
+                        Text(if (displayImage != null) "Change Photo" else "Add Photo")
+                    }
+
+                    OutlinedTextField(value = name, onValueChange = { name = it; nameError = null }, label = { Text("Full Name") }, isError = nameError != null, supportingText = { if (nameError != null) Text(nameError!!) }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = ageString, onValueChange = { ageString = it.filter { char -> char.isDigit() }; ageError = null }, label = { Text("Age") }, keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number), isError = ageError != null, supportingText = { if (ageError != null) Text(ageError!!) }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = relation, onValueChange = { relation = it; relationError = null }, label = { Text("Relation (e.g., Self, Spouse)") }, isError = relationError != null, supportingText = { if (relationError != null) Text(relationError!!) }, modifier = Modifier.fillMaxWidth())
+
+                    ExposedDropdownMenuBox(expanded = expandedGenderDropdown, onExpandedChange = { expandedGenderDropdown = !expandedGenderDropdown }, modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(value = gender, onValueChange = {}, readOnly = true, label = { Text("Gender") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedGenderDropdown) }, modifier = Modifier.menuAnchor().fillMaxWidth())
+                        ExposedDropdownMenu(expanded = expandedGenderDropdown, onDismissRequest = { expandedGenderDropdown = false }) {
+                            genderOptions.forEach { selectionOption ->
+                                DropdownMenuItem(text = { Text(selectionOption) }, onClick = {
                                     gender = selectionOption
                                     expandedGenderDropdown = false
-                                }
-                            )
+                                })
+                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    OutlinedButton(onClick = onDismiss) { Text("Cancel") }
-                    Button(onClick = {
-                        if (validateFields()) {
-                            val memberData = Member(
-                                id = memberToEdit?.id ?: java.util.UUID.randomUUID().toString(),
-                                name = name.trim(),
-                                age = ageString.toInt(),
-                                relation = relation.trim(),
-                                gender = gender,
-                                profileImageUri = memberToEdit?.profileImageUri
-                            )
-                            onConfirm(memberData, tempProfileImageUri)
-                        }
-                    }) {
-                        Text(if (memberToEdit == null) "Add Member" else "Save Changes")
-                    }
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
                 }
             }
         }

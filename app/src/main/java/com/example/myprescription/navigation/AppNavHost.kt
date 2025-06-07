@@ -1,6 +1,7 @@
 package com.example.myprescription.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -44,17 +45,17 @@ fun AppNavHost(
     ) {
         composable(AppDestinations.FAMILY_MEMBERS_ROUTE) {
             val familyViewModel: FamilyViewModel = viewModel(factory = FamilyViewModel.Factory)
-            // Pass memberDetailsViewModel factory when navigating if needed, or let MemberDetailsScreen create its own
             FamilyMembersScreen(
                 familyViewModel = familyViewModel,
                 onNavigateToMemberDetails = { memberId, memberName ->
-                    // MemberDetailsViewModel will be created in its screen, loadMemberData will be called there
                     navController.navigate("${AppDestinations.MEMBER_DETAILS_ROUTE}/$memberId/$memberName")
                 }
             )
         }
+
+        val memberDetailsRoute = "${AppDestinations.MEMBER_DETAILS_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}"
         composable(
-            route = "${AppDestinations.MEMBER_DETAILS_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}",
+            route = memberDetailsRoute,
             arguments = listOf(
                 navArgument(AppDestinations.MEMBER_ID_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.MEMBER_NAME_ARG) { type = NavType.StringType }
@@ -62,7 +63,7 @@ fun AppNavHost(
         ) { backStackEntry ->
             val memberId = backStackEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)
             val memberName = backStackEntry.arguments?.getString(AppDestinations.MEMBER_NAME_ARG)
-            // ViewModel created here, scoped to this destination
+            // ViewModel created and scoped to this destination
             val memberDetailsViewModel: MemberDetailsViewModel = viewModel(factory = MemberDetailsViewModel.Factory)
 
             if (memberId != null && memberName != null) {
@@ -70,7 +71,7 @@ fun AppNavHost(
                     memberId = memberId,
                     memberName = memberName,
                     memberDetailsViewModel = memberDetailsViewModel,
-                    onNavigateToViewDocument = { docId, docPath, docType, docTitle -> // docUri is now docPath
+                    onNavigateToViewDocument = { docId, docPath, docType, docTitle ->
                         navController.navigate(
                             "${AppDestinations.VIEW_DOCUMENT_ROUTE}/$docId/${docPath.encodeUri()}/$docType/${docTitle.encodeUri()}"
                         )
@@ -85,21 +86,27 @@ fun AppNavHost(
             route = "${AppDestinations.VIEW_DOCUMENT_ROUTE}/{${AppDestinations.DOCUMENT_ID_ARG}}/{${AppDestinations.DOCUMENT_URI_ARG}}/{${AppDestinations.DOCUMENT_TYPE_ARG}}/{${AppDestinations.DOCUMENT_TITLE_ARG}}",
             arguments = listOf(
                 navArgument(AppDestinations.DOCUMENT_ID_ARG) { type = NavType.StringType },
-                navArgument(AppDestinations.DOCUMENT_URI_ARG) { type = NavType.StringType }, // Will be file path
+                navArgument(AppDestinations.DOCUMENT_URI_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_TYPE_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_TITLE_ARG) { type = NavType.StringType }
             )
         ) { backStackEntry ->
+            // This is the key change: We get the parent back stack entry...
+            val parentEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(memberDetailsRoute)
+            }
+            // ...and scope the ViewModel to it, ensuring we get the SAME instance as the parent screen.
+            val memberDetailsViewModel: MemberDetailsViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = MemberDetailsViewModel.Factory)
+
             val documentId = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_ID_ARG)
-            val documentPath = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_URI_ARG)?.decodeUri() // This is now a file path
+            val documentPath = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_URI_ARG)?.decodeUri()
             val documentType = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_TYPE_ARG)
             val documentTitle = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_TITLE_ARG)?.decodeUri()
-            val memberDetailsViewModel: MemberDetailsViewModel = viewModel(factory = MemberDetailsViewModel.Factory)
 
             if (documentId != null && documentPath != null && documentType != null && documentTitle != null) {
                 ViewDocumentScreen(
                     documentId = documentId,
-                    documentUriString = documentPath, // Pass the file path
+                    documentUriString = documentPath,
                     documentType = documentType,
                     documentTitle = documentTitle,
                     memberDetailsViewModel = memberDetailsViewModel,
