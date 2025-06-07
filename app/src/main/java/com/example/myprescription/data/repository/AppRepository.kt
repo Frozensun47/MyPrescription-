@@ -24,10 +24,12 @@ class AppRepository(
         prescriptionDao.getPrescriptionsForMember(memberId)
     suspend fun insertPrescription(prescription: Prescription) = prescriptionDao.insertPrescription(prescription)
     suspend fun updatePrescription(prescription: Prescription) = prescriptionDao.updatePrescription(prescription)
+    suspend fun deletePrescription(prescription: Prescription) = prescriptionDao.deletePrescription(prescription) // Add this line
 
     // Report operations
     fun getReportsForMember(memberId: String): Flow<List<Report>> =
         reportDao.getReportsForMember(memberId)
     suspend fun insertReport(report: Report) = reportDao.insertReport(report)
     suspend fun updateReport(report: Report) = reportDao.updateReport(report)
+    suspend fun deleteReport(report: Report) = reportDao.deleteReport(report) // Add this line
 }

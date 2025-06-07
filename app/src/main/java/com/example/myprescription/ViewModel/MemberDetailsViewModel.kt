@@ -3,6 +3,7 @@ package com.example.myprescription.ViewModel
 import android.app.Application
 import android.content.Context
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -39,12 +40,20 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // --- Dialog States ---
     private val _showAddPrescriptionDialog = MutableStateFlow(false)
     val showAddPrescriptionDialog: StateFlow<Boolean> = _showAddPrescriptionDialog.asStateFlow()
 
     private val _showAddReportDialog = MutableStateFlow(false)
     val showAddReportDialog: StateFlow<Boolean> = _showAddReportDialog.asStateFlow()
 
+    private val _editingPrescription = MutableStateFlow<Prescription?>(null)
+    val editingPrescription: StateFlow<Prescription?> = _editingPrescription.asStateFlow()
+
+    private val _editingReport = MutableStateFlow<Report?>(null)
+    val editingReport: StateFlow<Report?> = _editingReport.asStateFlow()
+
+    // --- Upload Targets ---
     private val _targetPrescriptionIdForUpload = MutableStateFlow<String?>(null)
     private val _targetReportIdForUpload = MutableStateFlow<String?>(null)
 
@@ -55,8 +64,9 @@ class MemberDetailsViewModel(application: Application, private val repository: A
     private suspend fun saveFileToInternalStorage(context: Context, uri: Uri, type: String, itemId: String): String? {
         return try {
             val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-            // Use a more unique name to avoid collisions
-            val fileName = "${type}_${itemId}_${System.currentTimeMillis()}_${uri.lastPathSegment}".take(100)
+            val mimeType = context.contentResolver.getType(uri)
+            val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
+            val fileName = "${type}_${itemId}_${System.currentTimeMillis()}" + if (extension != null) ".$extension" else ""
             val file = File(context.filesDir, fileName)
             val outputStream = FileOutputStream(file)
             inputStream?.copyTo(outputStream)
@@ -69,10 +79,12 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         }
     }
 
+    // --- CRUD Operations ---
+
     fun addPrescription(prescriptionData: Prescription) {
         viewModelScope.launch {
             val memberId = _currentMemberId.value ?: return@launch
-            val finalPrescription = prescriptionData.copy(memberId = memberId, imageUri = null)
+            val finalPrescription = prescriptionData.copy(memberId = memberId, imageUri = "")
             repository.insertPrescription(finalPrescription)
         }
     }
@@ -80,18 +92,77 @@ class MemberDetailsViewModel(application: Application, private val repository: A
     fun addReport(reportData: Report) {
         viewModelScope.launch {
             val memberId = _currentMemberId.value ?: return@launch
-            val finalReport = reportData.copy(memberId = memberId, fileUri = null)
+            val finalReport = reportData.copy(memberId = memberId, fileUri = "")
             repository.insertReport(finalReport)
         }
     }
 
-    fun setTargetPrescriptionForUpload(prescriptionId: String) {
-        _targetPrescriptionIdForUpload.value = prescriptionId
+    fun updatePrescriptionDetails(id: String, doctorName: String, notes: String) {
+        viewModelScope.launch {
+            val prescription = prescriptions.value.find { it.id == id } ?: return@launch
+            val updatedPrescription = prescription.copy(doctorName = doctorName, notes = notes.ifBlank { null })
+            repository.updatePrescription(updatedPrescription)
+            onDismissDialogs()
+        }
     }
 
-    fun setTargetReportForUpload(reportId: String) {
-        _targetReportIdForUpload.value = reportId
+    fun updateReportDetails(id: String, reportName: String, notes: String) {
+        viewModelScope.launch {
+            val report = reports.value.find { it.id == id } ?: return@launch
+            val updatedReport = report.copy(reportName = reportName, notes = notes.ifBlank { null })
+            repository.updateReport(updatedReport)
+            onDismissDialogs()
+        }
     }
+
+    fun deletePrescription(prescription: Prescription) {
+        viewModelScope.launch {
+            prescription.imageUri?.split(',')?.filter { it.isNotBlank() }?.forEach { path ->
+                try { File(path).delete() } catch (e: Exception) { e.printStackTrace() }
+            }
+            repository.deletePrescription(prescription)
+        }
+    }
+
+    fun deleteReport(report: Report) {
+        viewModelScope.launch {
+            report.fileUri?.split(',')?.filter { it.isNotBlank() }?.forEach { path ->
+                try { File(path).delete() } catch (e: Exception) { e.printStackTrace() }
+            }
+            repository.deleteReport(report)
+        }
+    }
+
+    fun deleteFileFromPrescription(prescriptionId: String, pathToDelete: String) {
+        viewModelScope.launch {
+            val prescription = prescriptions.value.find { it.id == prescriptionId } ?: return@launch
+            val updatedPaths = prescription.imageUri
+                ?.split(',')
+                ?.filter { it.isNotBlank() && it != pathToDelete }
+                ?.joinToString(",")
+                ?: ""
+
+            repository.updatePrescription(prescription.copy(imageUri = updatedPaths))
+            try { File(pathToDelete).delete() } catch (e: Exception) { e.printStackTrace() }
+        }
+    }
+
+    fun deleteFileFromReport(reportId: String, pathToDelete: String) {
+        viewModelScope.launch {
+            val report = reports.value.find { it.id == reportId } ?: return@launch
+            val updatedPaths = report.fileUri
+                ?.split(',')
+                ?.filter { it.isNotBlank() && it != pathToDelete }
+                ?.joinToString(",")
+                ?: ""
+
+            repository.updateReport(report.copy(fileUri = updatedPaths))
+            try { File(pathToDelete).delete() } catch (e: Exception) { e.printStackTrace() }
+        }
+    }
+
+    fun setTargetPrescriptionForUpload(prescriptionId: String) { _targetPrescriptionIdForUpload.value = prescriptionId }
+    fun setTargetReportForUpload(reportId: String) { _targetReportIdForUpload.value = reportId }
 
     fun updatePrescriptionWithImages(pickedImageUris: List<Uri>) {
         viewModelScope.launch {
@@ -108,7 +179,6 @@ class MemberDetailsViewModel(application: Application, private val repository: A
 
             val updatedPrescription = currentPrescription.copy(imageUri = newPaths.joinToString(","))
             repository.updatePrescription(updatedPrescription)
-
             _targetPrescriptionIdForUpload.value = null
         }
     }
@@ -128,49 +198,43 @@ class MemberDetailsViewModel(application: Application, private val repository: A
 
             val updatedReport = currentReport.copy(fileUri = newPaths.joinToString(","))
             repository.updateReport(updatedReport)
-
             _targetReportIdForUpload.value = null
         }
     }
 
-
+    // --- Restored Notes Functions ---
     fun updatePrescriptionNotes(prescriptionId: String, newNotes: String) {
         viewModelScope.launch {
-            val memberId = _currentMemberId.value ?: return@launch
-            val prescription = prescriptions.value.find { it.id == prescriptionId && it.memberId == memberId }
-            prescription?.let {
-                repository.updatePrescription(it.copy(notes = newNotes.ifBlank { null }))
-            }
+            val prescription = prescriptions.value.find { it.id == prescriptionId } ?: return@launch
+            repository.updatePrescription(prescription.copy(notes = newNotes.ifBlank { null }))
         }
     }
 
     fun updateReportNotes(reportId: String, newNotes: String) {
         viewModelScope.launch {
-            val memberId = _currentMemberId.value ?: return@launch
-            val report = reports.value.find { it.id == reportId && it.memberId == memberId }
-            report?.let {
-                repository.updateReport(it.copy(notes = newNotes.ifBlank { null }))
-            }
+            val report = reports.value.find { it.id == reportId } ?: return@launch
+            repository.updateReport(report.copy(notes = newNotes.ifBlank { null }))
         }
     }
 
+    // --- Dialog Controls ---
     fun onAddPrescriptionClicked() { _showAddPrescriptionDialog.value = true }
-    fun onDismissPrescriptionDialog() { _showAddPrescriptionDialog.value = false }
     fun onAddReportClicked() { _showAddReportDialog.value = true }
-    fun onDismissReportDialog() { _showAddReportDialog.value = false }
+    fun onEditPrescriptionClicked(prescription: Prescription) { _editingPrescription.value = prescription }
+    fun onEditReportClicked(report: Report) { _editingReport.value = report }
+    fun onDismissDialogs() {
+        _showAddPrescriptionDialog.value = false
+        _showAddReportDialog.value = false
+        _editingPrescription.value = null
+        _editingReport.value = null
+    }
 
     companion object {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(
-                modelClass: Class<T>,
-                extras: CreationExtras
-            ): T {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
-                return MemberDetailsViewModel(
-                    application,
-                    (application as MyPrescriptionApplication).repository
-                ) as T
+                return MemberDetailsViewModel(application, (application as MyPrescriptionApplication).repository) as T
             }
         }
     }
