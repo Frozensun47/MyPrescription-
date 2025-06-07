@@ -9,14 +9,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,15 +54,19 @@ fun MemberDetailsScreen(
     val showAddReportDialog by memberDetailsViewModel.showAddReportDialog.collectAsState()
 
     val prescriptionImagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { memberDetailsViewModel.updatePrescriptionWithImage(it) }
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            memberDetailsViewModel.updatePrescriptionWithImages(uris)
+        }
     }
 
     val reportFilePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { memberDetailsViewModel.updateReportWithFile(it) }
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            memberDetailsViewModel.updateReportWithFiles(uris)
+        }
     }
 
     LaunchedEffect(memberId) {
@@ -120,12 +122,9 @@ fun MemberDetailsScreen(
             }
             Spacer(modifier = Modifier.height(8.dp))
 
-            val currentMemberPrescriptions = prescriptions
-            val currentMemberReports = reports
-
             when (selectedTabIndex) {
                 0 -> PrescriptionList(
-                    prescriptions = currentMemberPrescriptions,
+                    prescriptions = prescriptions,
                     onUploadClick = { prescription ->
                         memberDetailsViewModel.setTargetPrescriptionForUpload(prescription.id)
                         prescriptionImagePicker.launch("image/*")
@@ -137,10 +136,10 @@ fun MemberDetailsScreen(
                     }
                 )
                 1 -> ReportList(
-                    reports = currentMemberReports,
+                    reports = reports,
                     onUploadClick = { report ->
                         memberDetailsViewModel.setTargetReportForUpload(report.id)
-                        reportFilePicker.launch("application/pdf")
+                        reportFilePicker.launch("*/*")
                     },
                     onViewClick = { report ->
                         report.fileUri?.let { path ->
@@ -181,12 +180,12 @@ fun PrescriptionList(
     onViewClick: (Prescription) -> Unit
 ) {
     if (prescriptions.isEmpty()) {
-        EmptyStateView("No prescriptions added yet for this member.")
+        EmptyStateView("No prescriptions added yet.")
         return
     }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-        contentPadding = PaddingValues(vertical = 8.dp),
+        contentPadding = PaddingValues(bottom = 80.dp, top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(prescriptions, key = { it.id }) { prescription ->
@@ -202,12 +201,12 @@ fun ReportList(
     onViewClick: (Report) -> Unit
 ) {
     if (reports.isEmpty()) {
-        EmptyStateView("No reports added yet for this member.")
+        EmptyStateView("No reports added yet.")
         return
     }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-        contentPadding = PaddingValues(vertical = 8.dp),
+        contentPadding = PaddingValues(bottom = 80.dp, top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(reports, key = { it.id }) { report ->
@@ -238,11 +237,13 @@ fun PrescriptionCard(
     onUploadClick: (Prescription) -> Unit,
     onViewClick: (Prescription) -> Unit
 ) {
+    val imagePaths = prescription.imageUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
+
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = !prescription.imageUri.isNullOrEmpty()) {
-                if (!prescription.imageUri.isNullOrEmpty()) onViewClick(prescription)
+            .clickable(enabled = imagePaths.isNotEmpty()) {
+                if (imagePaths.isNotEmpty()) onViewClick(prescription)
             },
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
@@ -252,35 +253,45 @@ fun PrescriptionCard(
                 modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                if (!prescription.imageUri.isNullOrEmpty()) {
+                if (imagePaths.isNotEmpty()) {
                     Image(
-                        painter = rememberAsyncImagePainter(model = File(prescription.imageUri)),
+                        painter = rememberAsyncImagePainter(model = File(imagePaths.first())),
                         contentDescription = "Prescription Image",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
+                    if (imagePaths.size > 1) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(4.dp)
+                                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text("+${imagePaths.size - 1}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    }
                 } else {
-                    Icon(imageVector = Icons.Filled.Image, contentDescription = "Prescription Icon", tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(32.dp))
+                    Icon(imageVector = Icons.Filled.Image, contentDescription = "No Images", tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(32.dp))
                 }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text("Dr. ${prescription.doctorName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("Date: ${formatDate(prescription.date)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                prescription.notes?.let { if (it.isNotBlank()) { Spacer(modifier = Modifier.height(4.dp)); Text("Notes: $it", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis) } }
+                prescription.notes?.let { if (it.isNotBlank()) { Spacer(modifier = Modifier.height(4.dp)); Text("Notes: $it", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) } }
                 Spacer(modifier = Modifier.height(12.dp))
 
-                if (prescription.imageUri.isNullOrEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { onUploadClick(prescription) }, shape = RoundedCornerShape(8.dp)) {
-                        Icon(Icons.Filled.CloudUpload, contentDescription = "Upload Prescription", modifier = Modifier.size(18.dp))
+                        Icon(Icons.Filled.AddPhotoAlternate, contentDescription = "Add Images", modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Upload Image")
+                        Text("Add Images")
                     }
-                } else {
-                    OutlinedButton(onClick = { onViewClick(prescription) }, shape = RoundedCornerShape(8.dp)) {
-                        Icon(Icons.Filled.Visibility, contentDescription = "View Prescription", modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("View Image")
+                    if (imagePaths.isNotEmpty()) {
+                        OutlinedButton(onClick = { onViewClick(prescription) }, shape = RoundedCornerShape(8.dp)) {
+                            Icon(Icons.Filled.Visibility, contentDescription = "View", modifier = Modifier.size(18.dp))
+                        }
                     }
                 }
             }
@@ -294,11 +305,13 @@ fun ReportCard(
     onUploadClick: (Report) -> Unit,
     onViewClick: (Report) -> Unit
 ) {
+    val filePaths = report.fileUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
+
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = !report.fileUri.isNullOrEmpty()) {
-                if(!report.fileUri.isNullOrEmpty()) onViewClick(report)
+            .clickable(enabled = filePaths.isNotEmpty()) {
+                if(filePaths.isNotEmpty()) onViewClick(report)
             },
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
@@ -308,26 +321,25 @@ fun ReportCard(
                 modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.tertiaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "Report Icon", tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(32.dp))
+                Icon(imageVector = if (filePaths.size > 1) Icons.Filled.FolderCopy else Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "Report Icon", tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(32.dp))
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(report.reportName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("Date: ${formatDate(report.date)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                report.notes?.let { if (it.isNotBlank()) { Spacer(modifier = Modifier.height(4.dp)); Text("Notes: $it", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis) } }
+                Text("${filePaths.size} file(s) attached", style = MaterialTheme.typography.bodySmall)
                 Spacer(modifier = Modifier.height(12.dp))
 
-                if (report.fileUri.isNullOrEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { onUploadClick(report) }, shape = RoundedCornerShape(8.dp)) {
-                        Icon(Icons.Filled.CloudUpload, contentDescription = "Upload Report", modifier = Modifier.size(18.dp))
+                        Icon(Icons.Filled.FileUpload, contentDescription = "Add Files", modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Upload File")
+                        Text("Add Files")
                     }
-                } else {
-                    OutlinedButton(onClick = { onViewClick(report) }, shape = RoundedCornerShape(8.dp)) {
-                        Icon(Icons.Filled.Visibility, contentDescription = "View Report", modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("View Details")
+                    if(filePaths.isNotEmpty()) {
+                        OutlinedButton(onClick = { onViewClick(report) }, shape = RoundedCornerShape(8.dp)) {
+                            Icon(Icons.Filled.Visibility, contentDescription = "View", modifier = Modifier.size(18.dp))
+                        }
                     }
                 }
             }

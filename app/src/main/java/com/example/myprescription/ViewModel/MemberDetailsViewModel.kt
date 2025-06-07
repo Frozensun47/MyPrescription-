@@ -55,9 +55,9 @@ class MemberDetailsViewModel(application: Application, private val repository: A
     private suspend fun saveFileToInternalStorage(context: Context, uri: Uri, type: String, itemId: String): String? {
         return try {
             val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-            val extension = context.contentResolver.getType(uri)?.substringAfterLast('/') ?: "file"
-            val fileName = "${type}_${itemId}_${System.currentTimeMillis()}.$extension"
-            val file = File(context.filesDir, fileName) // Save to app's private files directory
+            // Use a more unique name to avoid collisions
+            val fileName = "${type}_${itemId}_${System.currentTimeMillis()}_${uri.lastPathSegment}".take(100)
+            val file = File(context.filesDir, fileName)
             val outputStream = FileOutputStream(file)
             inputStream?.copyTo(outputStream)
             inputStream?.close()
@@ -93,37 +93,46 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         _targetReportIdForUpload.value = reportId
     }
 
-    fun updatePrescriptionWithImage(pickedImageUri: Uri) {
+    fun updatePrescriptionWithImages(pickedImageUris: List<Uri>) {
         viewModelScope.launch {
             val targetId = _targetPrescriptionIdForUpload.value ?: return@launch
-            val memberId = _currentMemberId.value ?: return@launch
-            val currentPrescription = prescriptions.value.find { it.id == targetId && it.memberId == memberId } ?: return@launch
+            val currentPrescription = prescriptions.value.find { it.id == targetId } ?: return@launch
 
-            val imagePath = saveFileToInternalStorage(getApplication(), pickedImageUri, "prescription", targetId)
-            if (imagePath != null) {
-                currentPrescription.imageUri?.let { if (it != imagePath) File(it).delete() }
-                val updatedPrescription = currentPrescription.copy(imageUri = imagePath)
-                repository.updatePrescription(updatedPrescription)
+            val existingPaths = currentPrescription.imageUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
+            val newPaths = existingPaths.toMutableList()
+
+            for (uri in pickedImageUris) {
+                val imagePath = saveFileToInternalStorage(getApplication(), uri, "prescription", targetId)
+                imagePath?.let { newPaths.add(it) }
             }
+
+            val updatedPrescription = currentPrescription.copy(imageUri = newPaths.joinToString(","))
+            repository.updatePrescription(updatedPrescription)
+
             _targetPrescriptionIdForUpload.value = null
         }
     }
 
-    fun updateReportWithFile(pickedFileUri: Uri) {
+    fun updateReportWithFiles(pickedFileUris: List<Uri>) {
         viewModelScope.launch {
             val targetId = _targetReportIdForUpload.value ?: return@launch
-            val memberId = _currentMemberId.value ?: return@launch
-            val currentReport = reports.value.find { it.id == targetId && it.memberId == memberId } ?: return@launch
+            val currentReport = reports.value.find { it.id == targetId } ?: return@launch
 
-            val filePath = saveFileToInternalStorage(getApplication(), pickedFileUri, "report", targetId)
-            if (filePath != null) {
-                currentReport.fileUri?.let { if (it != filePath) File(it).delete() }
-                val updatedReport = currentReport.copy(fileUri = filePath)
-                repository.updateReport(updatedReport)
+            val existingPaths = currentReport.fileUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
+            val newPaths = existingPaths.toMutableList()
+
+            for (uri in pickedFileUris) {
+                val filePath = saveFileToInternalStorage(getApplication(), uri, "report", targetId)
+                filePath?.let { newPaths.add(it) }
             }
+
+            val updatedReport = currentReport.copy(fileUri = newPaths.joinToString(","))
+            repository.updateReport(updatedReport)
+
             _targetReportIdForUpload.value = null
         }
     }
+
 
     fun updatePrescriptionNotes(prescriptionId: String, newNotes: String) {
         viewModelScope.launch {
