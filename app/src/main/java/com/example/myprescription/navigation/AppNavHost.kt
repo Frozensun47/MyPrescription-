@@ -58,14 +58,16 @@ fun AppNavHost(
     val user by authViewModel.user.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
+    // Determine the start destination based on the current user's state
     val startDestination = remember(user, user?.uid) {
         val currentUser = Firebase.auth.currentUser
         if (currentUser != null) {
             application.initializeDependenciesForUser(currentUser.uid)
-            if (prefs.getPin(currentUser.uid) == null) {
-                AppDestinations.PIN_SETUP_ROUTE
-            } else {
+            // **CHANGE 1: If a PIN exists for the user, go to PIN entry. Otherwise, go to the main app screen.**
+            if (prefs.getPin(currentUser.uid) != null) {
                 AppDestinations.PIN_ENTRY_ROUTE
+            } else {
+                AppDestinations.FAMILY_MEMBERS_ROUTE
             }
         } else {
             AppDestinations.LOGIN_ROUTE
@@ -83,14 +85,10 @@ fun AppNavHost(
                     val loggedInUser = Firebase.auth.currentUser
                     if (loggedInUser != null) {
                         application.initializeDependenciesForUser(loggedInUser.uid)
-                        if (prefs.getPin(loggedInUser.uid) == null) {
-                            navController.navigate(AppDestinations.PIN_SETUP_ROUTE) {
-                                popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
-                            }
-                        } else {
-                            navController.navigate(AppDestinations.PIN_ENTRY_ROUTE) {
-                                popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
-                            }
+                        // **CHANGE 2: After login, go directly to the main screen.**
+                        // The user can set a PIN later from settings if they want.
+                        navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) {
+                            popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
                         }
                     }
                 }
@@ -112,6 +110,7 @@ fun AppNavHost(
                     onPinEntered = {}
                 )
             } else {
+                // Fallback if user is somehow null
                 navController.navigate(AppDestinations.LOGIN_ROUTE) {
                     popUpTo(navController.graph.id) { inclusive = true }
                 }
