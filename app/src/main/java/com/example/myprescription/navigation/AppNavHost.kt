@@ -136,6 +136,9 @@ fun AppNavHost(
         composable(AppDestinations.SETTINGS_ROUTE) {
             SettingsScreen(
                 onNavigateUp = { navController.navigateUp() },
+                onNavigateToChangePin = {
+                    navController.navigate(AppDestinations.PIN_SETUP_ROUTE)
+                },
                 onLogout = {
                     authViewModel.logout()
                     prefs.clear()
@@ -148,6 +151,7 @@ fun AppNavHost(
                     Firebase.auth.currentUser?.delete()
                     authViewModel.logout()
                     prefs.clear()
+
                     navController.navigate(AppDestinations.LOGIN_ROUTE) {
                         popUpTo(0) { inclusive = true }
                     }

@@ -21,6 +21,13 @@ class Prefs(context: Context) {
             sharedPreferences.edit().putString("USER_PIN", value).apply()
         }
 
+    // New property to control PIN screen visibility
+    var isPinEnabled: Boolean
+        get() = sharedPreferences.getBoolean("IS_PIN_ENABLED", true) // Default to true
+        set(value) {
+            sharedPreferences.edit().putBoolean("IS_PIN_ENABLED", value).apply()
+        }
+
     var isUserLoggedIn: Boolean
         get() = sharedPreferences.getBoolean("IS_LOGGED_IN", false)
         set(value) {
