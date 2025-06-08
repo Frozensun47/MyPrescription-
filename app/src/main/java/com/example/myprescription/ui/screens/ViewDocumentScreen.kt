@@ -187,7 +187,7 @@ fun ViewDocumentScreen(
                         DocumentGridItem(
                             filePath = path,
                             documentType = documentType,
-                            displayName = if (documentType == "prescription") "Image ${index + 1}" else "File ${index + 1}",
+                            displayName = if (documentType == "prescription") "Pres ${index + 1}" else "File ${index + 1}",
                             isSelected = path in selectedFilePaths,
                             onClick = {
                                 if (isInSelectionMode) {
@@ -437,7 +437,7 @@ private fun ImagePager(
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp),
+                    .padding(vertical = 100.dp),
                 horizontalArrangement = Arrangement.Center,
                 contentPadding = PaddingValues(horizontal = 8.dp)
             ) {
