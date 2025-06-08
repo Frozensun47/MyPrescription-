@@ -12,8 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
@@ -29,30 +27,26 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
+import com.example.myprescription.ViewModel.MemberDetailsViewModel
 import com.example.myprescription.model.Prescription
 import com.example.myprescription.model.Report
-import com.example.myprescription.ViewModel.MemberDetailsViewModel
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MemberDetailsScreen(
     memberId: String,
     memberName: String,
-    memberDetailsViewModel: MemberDetailsViewModel = viewModel(factory = MemberDetailsViewModel.Factory),
+    memberDetailsViewModel: MemberDetailsViewModel,
     onNavigateToViewDocument: (documentId: String, documentPath: String, documentType: String, documentTitle: String) -> Unit,
     onNavigateUp: () -> Unit
 ) {
     val prescriptions by memberDetailsViewModel.prescriptions.collectAsState()
     val reports by memberDetailsViewModel.reports.collectAsState()
-
-    // Dialog states
     val showAddPrescriptionDialog by memberDetailsViewModel.showAddPrescriptionDialog.collectAsState()
     val showAddReportDialog by memberDetailsViewModel.showAddReportDialog.collectAsState()
     val editingPrescription by memberDetailsViewModel.editingPrescription.collectAsState()
@@ -81,35 +75,42 @@ fun MemberDetailsScreen(
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(memberName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            TopAppBar(
+                title = { Text(memberName) },
                 navigationIcon = { IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp))
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            FloatingActionButton(
                 onClick = {
                     if (pagerState.currentPage == 0) memberDetailsViewModel.onAddPrescriptionClicked()
                     else memberDetailsViewModel.onAddReportClicked()
                 },
-                icon = { Icon(Icons.Filled.Add, "Add") },
-                text = { Text(if (pagerState.currentPage == 0) "Add Prescription" else "Add Report") }
-            )
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(Icons.Filled.Add, if (pagerState.currentPage == 0) "Add Prescription" else "Add Report")
+            }
         },
-        floatingActionButtonPosition = FabPosition.Center
     ) { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+        Column(modifier = Modifier
+            .padding(paddingValues)
+            .fillMaxSize()) {
+            PrimaryTabRow(
+                selectedTabIndex = pagerState.currentPage,
+                containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
                         selected = pagerState.currentPage == index,
                         onClick = {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(index)
-                            }
+                            coroutineScope.launch { pagerState.animateScrollToPage(index) }
                         },
-                        text = { Text(title) }
+                        text = { Text(title, fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal) },
+                        selectedContentColor = MaterialTheme.colorScheme.primary,
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -142,27 +143,6 @@ fun MemberDetailsScreen(
                 }
             }
         }
-    }
-
-    if (itemToDelete != null) {
-        AlertDialog(
-            onDismissRequest = { itemToDelete = null },
-            title = { Text("Confirm Deletion") },
-            text = { Text("Are you sure? This will delete the item and all its files permanently.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        when (val item = itemToDelete) {
-                            is Prescription -> memberDetailsViewModel.deletePrescription(item)
-                            is Report -> memberDetailsViewModel.deleteReport(item)
-                        }
-                        itemToDelete = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete") }
-            },
-            dismissButton = { OutlinedButton(onClick = { itemToDelete = null }) { Text("Cancel") } }
-        )
     }
 
     if (showAddPrescriptionDialog) {
@@ -198,6 +178,27 @@ fun MemberDetailsScreen(
             onUpdate = { id, name, notes -> memberDetailsViewModel.updateReportDetails(id, name, notes) }
         )
     }
+
+    if (itemToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { itemToDelete = null },
+            title = { Text("Confirm Deletion") },
+            text = { Text("Are you sure? This will delete the item and all its files permanently.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        when (val item = itemToDelete) {
+                            is Prescription -> memberDetailsViewModel.deletePrescription(item)
+                            is Report -> memberDetailsViewModel.deleteReport(item)
+                        }
+                        itemToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = { OutlinedButton(onClick = { itemToDelete = null }) { Text("Cancel") } }
+        )
+    }
 }
 
 @Composable
@@ -208,13 +209,14 @@ fun PrescriptionList(
     onDeleteClick: (Prescription) -> Unit,
     onEditClick: (Prescription) -> Unit
 ) {
-    if (prescriptions.isEmpty()) { EmptyStateView("No prescriptions added yet.")
+    if (prescriptions.isEmpty()) {
+        EmptyStateView("No prescriptions added yet for this member.")
         return
     }
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-        contentPadding = PaddingValues(bottom = 80.dp, top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 80.dp, start = 16.dp, end = 16.dp, top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(prescriptions, key = { it.id }) { prescription ->
             PrescriptionCard(prescription, onUploadClick, onViewClick, onDeleteClick, onEditClick)
@@ -230,13 +232,14 @@ fun ReportList(
     onDeleteClick: (Report) -> Unit,
     onEditClick: (Report) -> Unit
 ) {
-    if (reports.isEmpty()) { EmptyStateView("No reports added yet.")
+    if (reports.isEmpty()) {
+        EmptyStateView("No reports added yet for this member.")
         return
     }
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-        contentPadding = PaddingValues(bottom = 80.dp, top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 80.dp, start = 16.dp, end = 16.dp, top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(reports, key = { it.id }) { report ->
             ReportCard(report, onUploadClick, onViewClick, onDeleteClick, onEditClick)
@@ -254,52 +257,87 @@ fun PrescriptionCard(
 ) {
     val imagePaths = prescription.imageUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
 
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth().clickable(enabled = imagePaths.isNotEmpty()) { onViewClick(prescription) },
-        shape = RoundedCornerShape(12.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = { if (imagePaths.isNotEmpty()) onViewClick(prescription) },
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
     ) {
-        Row(modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 16.dp), verticalAlignment = Alignment.Top) {
-            Box(
-                modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                if (imagePaths.isNotEmpty()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.MedicalServices,
+                    contentDescription = "Prescription Icon",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Dr. ${prescription.doctorName}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        formatDate(prescription.date),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { onEditClick(prescription) }) { Icon(Icons.Default.Edit, "Edit") }
+                IconButton(onClick = { onDeleteClick(prescription) }) { Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error) }
+            }
+
+            if (!prescription.notes.isNullOrBlank()) {
+                Text(
+                    "Notes: ${prescription.notes}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            if (imagePaths.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.medium)
+                        .clickable { onViewClick(prescription) }
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(8.dp)
+                ) {
                     Image(
                         painter = rememberAsyncImagePainter(model = File(imagePaths.first())),
                         contentDescription = "Prescription Image",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(MaterialTheme.shapes.small)
                     )
-                    if (imagePaths.size > 1) {
-                        Box(
-                            modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape).padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("+${imagePaths.size - 1}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        }
-                    }
-                } else {
-                    Icon(Icons.Filled.Image, "No Images", tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = if (imagePaths.size == 1) "View 1 image" else "View ${imagePaths.size} images",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Default.ChevronRight, "View", modifier = Modifier.size(16.dp))
                 }
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Dr. ${prescription.doctorName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("Date: ${formatDate(prescription.date)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                prescription.notes?.let { if (it.isNotBlank()) { Spacer(Modifier.height(4.dp)); Text("Notes: $it", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) } }
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = { onUploadClick(prescription) }, shape = RoundedCornerShape(8.dp)) {
-                    Icon(Icons.Filled.AddPhotoAlternate, "Add Images", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Add")
+
+            Row(modifier = Modifier.padding(top = 8.dp)) {
+                Button(onClick = { onUploadClick(prescription) }) {
+                    Icon(Icons.Default.AddPhotoAlternate, "Add photos", modifier = Modifier.size(ButtonDefaults.IconSize))
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text("Add Photos")
                 }
-            }
-            Column {
-                IconButton(onClick = { onEditClick(prescription) }) { Icon(Icons.Filled.Edit, "Edit", tint = MaterialTheme.colorScheme.secondary) }
-                IconButton(onClick = { onDeleteClick(prescription) }) { Icon(Icons.Filled.Delete, "Delete", tint = MaterialTheme.colorScheme.error) }
             }
         }
     }
 }
+
 
 @Composable
 fun ReportCard(
@@ -311,36 +349,106 @@ fun ReportCard(
 ) {
     val filePaths = report.fileUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
 
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth().clickable(enabled = filePaths.isNotEmpty()) { onViewClick(report) },
-        shape = RoundedCornerShape(12.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = { if (filePaths.isNotEmpty()) onViewClick(report) },
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
     ) {
-        Row(modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 16.dp), verticalAlignment = Alignment.Top) {
-            Icon(if (filePaths.size > 1) Icons.Filled.FolderCopy else Icons.AutoMirrored.Filled.InsertDriveFile, "Report Icon", modifier = Modifier.size(60.dp), tint = MaterialTheme.colorScheme.tertiary)
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(report.reportName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("Date: ${formatDate(report.date)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("${filePaths.size} file(s) attached", style = MaterialTheme.typography.bodySmall)
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = { onUploadClick(report) }, shape = RoundedCornerShape(8.dp)) {
-                    Icon(Icons.Filled.FileUpload, "Add Files", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Add")
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.AutoMirrored.Filled.InsertDriveFile,
+                    contentDescription = "Report Icon",
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        report.reportName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        formatDate(report.date),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { onEditClick(report) }) { Icon(Icons.Default.Edit, "Edit") }
+                IconButton(onClick = { onDeleteClick(report) }) { Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error) }
+            }
+
+            if (!report.notes.isNullOrBlank()) {
+                Text(
+                    "Notes: ${report.notes}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            if (filePaths.isNotEmpty()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.medium)
+                        .clickable { onViewClick(report) }
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Folder,
+                        contentDescription = "Folder Icon",
+                        modifier = Modifier.size(40.dp),
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = if (filePaths.size == 1) "View 1 file" else "View ${filePaths.size} files",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Default.ChevronRight, "View", modifier = Modifier.size(16.dp))
                 }
             }
-            Column {
-                IconButton(onClick = { onEditClick(report) }) { Icon(Icons.Filled.Edit, "Edit", tint = MaterialTheme.colorScheme.secondary) }
-                IconButton(onClick = { onDeleteClick(report) }) { Icon(Icons.Filled.Delete, "Delete", tint = MaterialTheme.colorScheme.error) }
+
+            Row(modifier = Modifier.padding(top = 8.dp)) {
+                Button(onClick = { onUploadClick(report) }) {
+                    Icon(Icons.Default.FileUpload, "Add files", modifier = Modifier.size(ButtonDefaults.IconSize))
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text("Add Files")
+                }
             }
         }
     }
 }
 
-
-
 fun formatDate(date: Date): String {
     return SimpleDateFormat("dd MMM yy, hh:mm a", Locale.getDefault()).format(date)
+}
+
+@Composable
+fun EmptyStateView(message: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp), contentAlignment = Alignment.Center
+    ) {
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 @Composable
@@ -349,7 +457,7 @@ fun AddOrEditPrescriptionDialog(
     prescriptionToEdit: Prescription? = null,
     onDismiss: () -> Unit,
     onAdd: (Prescription) -> Unit = {},
-    onUpdate: (id: String, doctorName: String, notes: String) -> Unit = {_,_,_ ->}
+    onUpdate: (id: String, doctorName: String, notes: String) -> Unit = { _, _, _ -> }
 ) {
     var doctorName by remember { mutableStateOf(prescriptionToEdit?.doctorName ?: "") }
     var notes by remember { mutableStateOf(prescriptionToEdit?.notes ?: "") }
@@ -357,12 +465,28 @@ fun AddOrEditPrescriptionDialog(
     val isEditing = prescriptionToEdit != null
 
     Dialog(onDismissRequest = onDismiss) {
-        Card(shape = RoundedCornerShape(16.dp)) {
-            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(if(isEditing) "Edit Prescription" else "Add New Prescription", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                OutlinedTextField(value = doctorName, onValueChange = { doctorName = it; doctorError = null }, label = { Text("Doctor's Name") }, isError = doctorError != null, supportingText = { if (doctorError != null) Text(doctorError!!) })
-                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes (Optional)") }, minLines = 3)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+        Card(shape = MaterialTheme.shapes.large) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = if(isEditing) "Edit Prescription" else "Add New Prescription",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(24.dp)
+                )
+                Column(
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    OutlinedTextField(value = doctorName, onValueChange = { doctorName = it; doctorError = null }, label = { Text("Doctor's Name") }, isError = doctorError != null, supportingText = { if (doctorError != null) Text(doctorError!!) })
+                    OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes (Optional)") }, minLines = 3)
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.End,
+                ) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = {
@@ -389,7 +513,7 @@ fun AddOrEditReportDialog(
     reportToEdit: Report? = null,
     onDismiss: () -> Unit,
     onAdd: (Report) -> Unit = {},
-    onUpdate: (id: String, name: String, notes: String) -> Unit = {_,_,_ ->}
+    onUpdate: (id: String, name: String, notes: String) -> Unit = { _, _, _ -> }
 ) {
     var reportName by remember { mutableStateOf(reportToEdit?.reportName ?: "") }
     var notes by remember { mutableStateOf(reportToEdit?.notes ?: "") }
@@ -397,12 +521,29 @@ fun AddOrEditReportDialog(
     val isEditing = reportToEdit != null
 
     Dialog(onDismissRequest = onDismiss) {
-        Card(shape = RoundedCornerShape(16.dp)) {
-            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(if (isEditing) "Edit Report" else "Add New Report", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                OutlinedTextField(value = reportName, onValueChange = { reportName = it; nameError = null }, label = { Text("Report Name") }, isError = nameError != null, supportingText = { if (nameError != null) Text(nameError!!) })
-                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes (Optional)") }, minLines = 3)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+        Card(shape = MaterialTheme.shapes.large) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = if (isEditing) "Edit Report" else "Add New Report",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(24.dp)
+                )
+                Column(
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    OutlinedTextField(value = reportName, onValueChange = { reportName = it; nameError = null }, label = { Text("Report Name") }, isError = nameError != null, supportingText = { if (nameError != null) Text(nameError!!) })
+                    OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes (Optional)") }, minLines = 3)
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.End,
+                ) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = {

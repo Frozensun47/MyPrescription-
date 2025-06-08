@@ -6,22 +6,19 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +39,7 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.delay
 
 @Composable
 fun LoginScreen(
@@ -54,21 +52,10 @@ fun LoginScreen(
     var isVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        delay(300) // Small delay for a smoother entry
         isVisible = true
     }
 
-    // --- Floating Animation Setup ---
-    val infiniteTransition = rememberInfiniteTransition(label = "logo_float_transition")
-    val logoOffsetY by infiniteTransition.animateFloat(
-        initialValue = -10f,
-        targetValue = 10f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ), label = "logo_offset_y"
-    )
-
-    // --- Correct Google Sign-In Logic from AuthViewModel ---
     val signInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -77,9 +64,17 @@ fun LoginScreen(
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             try {
                 val account = task.getResult(ApiException::class.java)!!
-                firebaseAuthWithGoogle(account.idToken!!) {
-                    onLoginSuccess()
-                }
+                val credential = GoogleAuthProvider.getCredential(account.idToken!!, null)
+                Firebase.auth.signInWithCredential(credential)
+                    .addOnCompleteListener { authTask ->
+                        if (authTask.isSuccessful) {
+                            onLoginSuccess()
+                        } else {
+                            isLoading = false
+                            Log.w("LoginScreen", "FirebaseAuth failed", authTask.exception)
+                            Toast.makeText(context, "Authentication failed.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
             } catch (e: ApiException) {
                 isLoading = false
                 Log.w("LoginScreen", "Google sign in failed", e)
@@ -87,54 +82,65 @@ fun LoginScreen(
             }
         } else {
             isLoading = false
-            Toast.makeText(context, "Google sign-in cancelled.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Google sign-in was cancelled.", Toast.LENGTH_SHORT).show()
         }
     }
+
     val launchSignIn: () -> Unit = {
+        isLoading = true
         val signInIntent = authViewModel.getSignInIntent()
         signInLauncher.launch(signInIntent)
     }
 
-    // --- Your Desired UI ---
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+    Surface(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
         ) {
-            AnimatedVisibility(
-                visible = isVisible,
-                enter = fadeIn(animationSpec = tween(1000)) +
-                        slideInVertically(initialOffsetY = { -it / 2 }, animationSpec = tween(1000))
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                Spacer(modifier = Modifier.weight(1f))
+
+                AnimatedVisibility(
+                    visible = isVisible,
+                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 200)) +
+                            slideInVertically(initialOffsetY = { it / 2 }, animationSpec = tween(1000))
                 ) {
-                    // Animated Logo
                     Image(
                         painter = painterResource(id = R.mipmap.my_prescription_foreground),
                         contentDescription = "App Logo",
-                        modifier = Modifier
-                            .size(200.dp)
-                            .offset(y = logoOffsetY.dp),
+                        modifier = Modifier.size(150.dp),
                         contentScale = ContentScale.Fit,
                         colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
                     )
+                }
 
+                Spacer(modifier = Modifier.height(24.dp))
+
+                AnimatedVisibility(
+                    visible = isVisible,
+                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 400)) +
+                            slideInVertically(initialOffsetY = { it / 2 }, animationSpec = tween(1000, delayMillis = 200))
+                ) {
                     Text(
                         text = "Welcome to MyPrescription",
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.primary
+                        textAlign = TextAlign.Center
                     )
+                }
 
+                Spacer(modifier = Modifier.height(8.dp))
+
+                AnimatedVisibility(
+                    visible = isVisible,
+                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 600)) +
+                            slideInVertically(initialOffsetY = { it / 2 }, animationSpec = tween(1000, delayMillis = 400))
+                ) {
                     Text(
                         "Sign in to securely store and manage your medical records.",
                         style = MaterialTheme.typography.bodyLarge,
@@ -143,47 +149,34 @@ fun LoginScreen(
                         modifier = Modifier.padding(horizontal = 24.dp)
                     )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.weight(1f))
 
-            TermsAndConditionsCheckbox(
-                checked = termsAccepted,
-                onCheckedChange = onTermsAcceptedChange
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = launchSignIn,
-                enabled = termsAccepted,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
-                shape = RoundedCornerShape(12.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
-            ) {
-                Text(
-                    text = "Sign In with Google",
-                    fontSize = 16.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                TermsAndConditionsCheckbox(
+                    checked = termsAccepted,
+                    onCheckedChange = onTermsAcceptedChange
                 )
-            }
-        }
 
-        if (isLoading) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background.copy(alpha = 0.6f)
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ){
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Signing in, please wait...")
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = launchSignIn,
+                    enabled = termsAccepted && !isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                ) {
+                    Icon(painter = painterResource(id = R.drawable.ic_google_logo), contentDescription = null, modifier = Modifier.size(24.dp), tint = androidx.compose.ui.graphics.Color.Unspecified)
+                    Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(
+                        text = "Sign In with Google",
+                        fontSize = 16.sp,
+                    )
                 }
+            }
+
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
         }
     }
@@ -200,7 +193,7 @@ private fun TermsAndConditionsCheckbox(
         append("I agree to the ")
         pushStringAnnotation(tag = "TERMS", annotation = "https://example.com/terms")
         withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
-            append("Terms and Conditions")
+            append("Terms & Conditions")
         }
         pop()
         append(" and ")
@@ -213,11 +206,14 @@ private fun TermsAndConditionsCheckbox(
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(horizontal = 32.dp)
+        modifier = Modifier
+            .clip(CircleShape)
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Checkbox(
             checked = checked,
-            onCheckedChange = onCheckedChange
+            onCheckedChange = null
         )
         Spacer(modifier = Modifier.width(8.dp))
         ClickableText(
@@ -231,16 +227,4 @@ private fun TermsAndConditionsCheckbox(
             }
         )
     }
-}
-
-private fun firebaseAuthWithGoogle(idToken: String, onLoginSuccess: () -> Unit) {
-    val credential = GoogleAuthProvider.getCredential(idToken, null)
-    Firebase.auth.signInWithCredential(credential)
-        .addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                onLoginSuccess()
-            } else {
-                Log.w("LoginScreen", "signInWithCredential;failure", task.exception)
-            }
-        }
 }

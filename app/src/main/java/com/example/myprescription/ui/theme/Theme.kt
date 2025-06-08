@@ -3,11 +3,7 @@ package com.example.myprescription.ui.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
@@ -15,32 +11,22 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
-import com.example.myprescription.R // This is for your project's resources
+
 private val AppDarkColorScheme = darkColorScheme(
-    primary = BluePrimaryDark,
-    onPrimary = BlueOnPrimaryDark,
-    primaryContainer = BluePrimaryContainerDark,
-    onPrimaryContainer = BlueOnPrimaryContainerDark,
-    secondary = BlueSecondaryDark,
-    onSecondary = BlueOnSecondaryDark,
-    secondaryContainer = BlueSecondaryContainerDark,
-    onSecondaryContainer = BlueOnSecondaryContainerDark,
-    tertiary = BlueTertiaryDark,
-    onTertiary = BlueOnTertiaryDark,
-    tertiaryContainer = BlueTertiaryContainerDark,
-    onTertiaryContainer = BlueOnTertiaryContainerDark,
+    primary = PrimaryDark,
+    onPrimary = OnPrimaryDark,
+    primaryContainer = PrimaryContainerDark,
+    onPrimaryContainer = OnPrimaryContainerDark,
+    secondary = SecondaryDark,
+    onSecondary = OnSecondaryDark,
+    secondaryContainer = SecondaryContainerDark,
+    onSecondaryContainer = OnSecondaryContainerDark,
+    tertiary = TertiaryDark,
+    onTertiary = OnTertiaryDark,
+    tertiaryContainer = TertiaryContainerDark,
+    onTertiaryContainer = OnTertiaryContainerDark,
     error = ErrorDark,
     onError = OnErrorDark,
-    errorContainer = Color(0xFF93000A),
-    onErrorContainer = Color(0xFFFFDAD6),
     background = BackgroundDark,
     onBackground = OnBackgroundDark,
     surface = SurfaceDark,
@@ -51,22 +37,20 @@ private val AppDarkColorScheme = darkColorScheme(
 )
 
 private val AppLightColorScheme = lightColorScheme(
-    primary = BluePrimaryLight,
-    onPrimary = BlueOnPrimaryLight,
-    primaryContainer = BluePrimaryContainerLight,
-    onPrimaryContainer = BlueOnPrimaryContainerLight,
-    secondary = BlueSecondaryLight,
-    onSecondary = BlueOnSecondaryLight,
-    secondaryContainer = BlueSecondaryContainerLight,
-    onSecondaryContainer = BlueOnSecondaryContainerLight,
-    tertiary = BlueTertiaryLight,
-    onTertiary = BlueOnTertiaryLight,
-    tertiaryContainer = BlueTertiaryContainerLight,
-    onTertiaryContainer = BlueOnTertiaryContainerLight,
+    primary = PrimaryLight,
+    onPrimary = OnPrimaryLight,
+    primaryContainer = PrimaryContainerLight,
+    onPrimaryContainer = OnPrimaryContainerLight,
+    secondary = SecondaryLight,
+    onSecondary = OnSecondaryLight,
+    secondaryContainer = SecondaryContainerLight,
+    onSecondaryContainer = OnSecondaryContainerLight,
+    tertiary = TertiaryLight,
+    onTertiary = OnTertiaryLight,
+    tertiaryContainer = TertiaryContainerLight,
+    onTertiaryContainer = OnTertiaryContainerLight,
     error = ErrorLight,
     onError = OnErrorLight,
-    errorContainer = Color(0xFFFDECEA),
-    onErrorContainer = Color(0xFF640001),
     background = BackgroundLight,
     onBackground = OnBackgroundLight,
     surface = SurfaceLight,
@@ -94,29 +78,17 @@ fun MyPrescriptionTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            val insetsController = WindowCompat.getInsetsController(window, view) // Corrected variable name
-
-            window.statusBarColor = colorScheme.primary.toArgb() // Set status bar color
-            insetsController.isAppearanceLightStatusBars = !darkTheme // Set icons based on theme
+            window.statusBarColor = Color.Transparent.toArgb()
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !darkTheme
         }
     }
 
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = Shapes,
         content = content
-    )
-}
-
-@Composable
-fun AppBarLogo(onLogoClick: () -> Unit = {}) {
-    Image(
-        painter = painterResource(id = R.mipmap.splash_screen_foreground), // Using the launcher icon as an example
-        contentDescription = "App Logo",
-        modifier = Modifier
-            .size(70.dp)
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .clickable(onClick = onLogoClick)
-            .padding(4.dp)
     )
 }

@@ -17,10 +17,8 @@ import com.example.myprescription.ViewModel.FamilyViewModel
 import com.example.myprescription.ViewModel.MemberDetailsViewModel
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -56,18 +54,17 @@ fun AppNavHost(
     val context = LocalContext.current
     val application = context.applicationContext as MyPrescriptionApplication
     val prefs = remember { Prefs(context) }
-    val authViewModel: AuthViewModel = viewModel()
-    val user by authViewModel.user.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
-    val startDestination = remember(user, user?.uid) {
+    // Determine the start destination once
+    val startDestination = remember {
         val currentUser = Firebase.auth.currentUser
         if (currentUser != null) {
             application.initializeDependenciesForUser(currentUser.uid)
-            if (prefs.getPin(currentUser.uid) != null) {
-                AppDestinations.PIN_ENTRY_ROUTE
+            if (prefs.getPin(currentUser.uid) == null) {
+                AppDestinations.PIN_SETUP_ROUTE
             } else {
-                AppDestinations.FAMILY_MEMBERS_ROUTE
+                AppDestinations.PIN_ENTRY_ROUTE
             }
         } else {
             AppDestinations.LOGIN_ROUTE
@@ -80,12 +77,19 @@ fun AppNavHost(
         modifier = modifier
     ) {
         composable(AppDestinations.LOGIN_ROUTE) {
+            val authViewModel: AuthViewModel = viewModel()
             LoginScreen(
+                authViewModel = authViewModel,
                 onLoginSuccess = {
                     val loggedInUser = Firebase.auth.currentUser
                     if (loggedInUser != null) {
                         application.initializeDependenciesForUser(loggedInUser.uid)
-                        navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) {
+                        val nextRoute = if (prefs.getPin(loggedInUser.uid) == null) {
+                            AppDestinations.PIN_SETUP_ROUTE
+                        } else {
+                            AppDestinations.PIN_ENTRY_ROUTE
+                        }
+                        navController.navigate(nextRoute) {
                             popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
                         }
                     }
@@ -94,36 +98,30 @@ fun AppNavHost(
         }
 
         composable(AppDestinations.PIN_SETUP_ROUTE) {
-            val currentUser = Firebase.auth.currentUser
-            if (currentUser != null) {
-                PinScreen(
-                    mode = PinScreenMode.SET,
-                    error = null,
-                    onPinSet = { pin ->
-                        prefs.setPin(currentUser.uid, pin)
+            PinScreen(
+                mode = PinScreenMode.SET,
+                error = null,
+                onPinSet = { pin ->
+                    Firebase.auth.currentUser?.uid?.let { userId ->
+                        prefs.setPin(userId, pin)
                         navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) {
                             popUpTo(navController.graph.id) { inclusive = true }
                         }
-                    },
-                    onPinEntered = {}
-                )
-            } else {
-                navController.navigate(AppDestinations.LOGIN_ROUTE) {
-                    popUpTo(navController.graph.id) { inclusive = true }
-                }
-            }
+                    }
+                },
+                onPinEntered = {}
+            )
         }
 
         composable(AppDestinations.PIN_ENTRY_ROUTE) {
-            val currentUser = Firebase.auth.currentUser
-            if (currentUser != null) {
-                var error by remember { mutableStateOf<String?>(null) }
-                PinScreen(
-                    mode = PinScreenMode.ENTER,
-                    error = error,
-                    onPinSet = {},
-                    onPinEntered = { pin ->
-                        if (pin == prefs.getPin(currentUser.uid)) {
+            var error by remember { mutableStateOf<String?>(null) }
+            PinScreen(
+                mode = PinScreenMode.ENTER,
+                error = error,
+                onPinSet = {},
+                onPinEntered = { pin ->
+                    Firebase.auth.currentUser?.uid?.let { userId ->
+                        if (pin == prefs.getPin(userId)) {
                             navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) {
                                 popUpTo(AppDestinations.PIN_ENTRY_ROUTE) { inclusive = true }
                             }
@@ -131,18 +129,16 @@ fun AppNavHost(
                             error = "Incorrect PIN"
                         }
                     }
-                )
-            } else {
-                navController.navigate(AppDestinations.LOGIN_ROUTE) {
-                    popUpTo(navController.graph.id) { inclusive = true }
                 }
-            }
+            )
         }
 
         composable(AppDestinations.FAMILY_MEMBERS_ROUTE) {
             val familyViewModel: FamilyViewModel = viewModel(factory = FamilyViewModel.Factory)
+            val authViewModel: AuthViewModel = viewModel()
             FamilyMembersScreen(
                 familyViewModel = familyViewModel,
+                authViewModel = authViewModel,
                 onNavigateToMemberDetails = { memberId, memberName ->
                     navController.navigate("${AppDestinations.MEMBER_DETAILS_ROUTE}/$memberId/$memberName")
                 },
@@ -153,113 +149,101 @@ fun AppNavHost(
                     authViewModel.logout()
                     application.onUserLogout()
                     navController.navigate(AppDestinations.LOGIN_ROUTE) {
-                        popUpTo(0) { inclusive = true }
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
                     }
                 }
             )
         }
 
         composable(AppDestinations.SETTINGS_ROUTE) {
-            val currentUser = Firebase.auth.currentUser
-            if (currentUser != null) {
-                SettingsScreen(
-                    userId = currentUser.uid,
-                    onNavigateUp = { navController.navigateUp() },
-                    onNavigateToChangePin = {
-                        navController.navigate(AppDestinations.PIN_SETUP_ROUTE)
-                    },
-                    onLogout = {
-                        authViewModel.logout()
-                        application.onUserLogout()
-                        navController.navigate(AppDestinations.LOGIN_ROUTE) {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    },
-                    onDeleteAccount = {
-                        coroutineScope.launch {
-                            withContext(Dispatchers.IO) {
-                                val repository = application.repository
-                                if (repository != null) {
-                                    val members = repository.getAllMembersOnce()
-                                    for (member in members) {
-                                        member.profileImageUri?.let { File(it).delete() }
-                                        val prescriptions = repository.getPrescriptionsForMember(member.id).first()
-                                        prescriptions.forEach { p -> p.imageUri?.split(',')?.filter{it.isNotBlank()}?.forEach { path -> File(path).delete() } }
-                                        val reports = repository.getReportsForMember(member.id).first()
-                                        reports.forEach { r -> r.fileUri?.split(',')?.filter{it.isNotBlank()}?.forEach { path -> File(path).delete() } }
-                                    }
-                                    repository.clearAllDatabaseTables()
-                                }
+            val authViewModel: AuthViewModel = viewModel()
+            SettingsScreen(
+                userId = Firebase.auth.currentUser?.uid ?: "",
+                onNavigateUp = { navController.navigateUp() },
+                onNavigateToChangePin = { navController.navigate(AppDestinations.PIN_SETUP_ROUTE) },
+                onLogout = {
+                    authViewModel.logout()
+                    application.onUserLogout()
+                    navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
+                },
+                onDeleteAccount = {
+                    coroutineScope.launch {
+                        val repository = application.repository
+                        if (repository != null) {
+                            val members = repository.getAllMembersOnce()
+                            for (member in members) {
+                                member.profileImageUri?.let { File(it).delete() }
+                                val prescriptions = repository.getPrescriptionsForMember(member.id).first()
+                                prescriptions.forEach { p -> p.imageUri?.split(',')?.filter{it.isNotBlank()}?.forEach { path -> File(path).delete() } }
+                                val reports = repository.getReportsForMember(member.id).first()
+                                reports.forEach { r -> r.fileUri?.split(',')?.filter{it.isNotBlank()}?.forEach { path -> File(path).delete() } }
                             }
-
-                            Firebase.auth.currentUser?.delete()?.addOnCompleteListener {
-                                authViewModel.logout()
-                                application.onUserLogout()
-                                prefs.clearAllData()
-                                navController.navigate(AppDestinations.LOGIN_ROUTE) {
-                                    popUpTo(0) { inclusive = true }
-                                }
+                            repository.clearAllDatabaseTables()
+                        }
+                        Firebase.auth.currentUser?.delete()?.addOnCompleteListener {
+                            authViewModel.logout()
+                            application.onUserLogout()
+                            prefs.clearAllData()
+                            navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
                             }
                         }
                     }
-                )
-            }
+                }
+            )
         }
 
-        composable(AppDestinations.ABOUT_ROUTE) {
-            AboutScreen(onNavigateUp = { navController.navigateUp() })
-        }
+        composable(AppDestinations.ABOUT_ROUTE) { AboutScreen(onNavigateUp = { navController.navigateUp() }) }
+        composable(AppDestinations.HELP_ROUTE) { HelpScreen(onNavigateUp = { navController.navigateUp() }) }
 
-        composable(AppDestinations.HELP_ROUTE) {
-            HelpScreen(onNavigateUp = { navController.navigateUp() })
-        }
-
-        val memberDetailsRoute = "${AppDestinations.MEMBER_DETAILS_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}"
         composable(
-            route = memberDetailsRoute,
+            route = "${AppDestinations.MEMBER_DETAILS_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}",
             arguments = listOf(
                 navArgument(AppDestinations.MEMBER_ID_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.MEMBER_NAME_ARG) { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val memberId = backStackEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)!!
-            val memberName = backStackEntry.arguments?.getString(AppDestinations.MEMBER_NAME_ARG)!!
+            val memberId = backStackEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)
+            val memberName = backStackEntry.arguments?.getString(AppDestinations.MEMBER_NAME_ARG)
+            val memberDetailsViewModel: MemberDetailsViewModel = viewModel(factory = MemberDetailsViewModel.Factory)
 
-            MemberDetailsScreen(
-                memberId = memberId,
-                memberName = memberName,
-                // THE FIX IS HERE: The lambda now correctly accepts 4 parameters
-                // to match the function definition you provided. The memberId from the
-                // outer scope is used to build the final navigation route.
-                onNavigateToViewDocument = { docId, docPath, docType, docTitle ->
-                    navController.navigate("${AppDestinations.VIEW_DOCUMENT_ROUTE}/$memberId/$docId/${docPath.encodeUri()}/$docType/${docTitle.encodeUri()}")
-                },
-                onNavigateUp = { navController.navigateUp() }
-            )
+            if (memberId != null && memberName != null) {
+                MemberDetailsScreen(
+                    memberId = memberId,
+                    memberName = memberName,
+                    memberDetailsViewModel = memberDetailsViewModel,
+                    onNavigateToViewDocument = { docId, docPath, docType, docTitle ->
+                        navController.navigate("${AppDestinations.VIEW_DOCUMENT_ROUTE}/$docId/${docPath.encodeUri()}/$docType/${docTitle.encodeUri()}")
+                    },
+                    onNavigateUp = { navController.navigateUp() }
+                )
+            } else {
+                navController.navigateUp()
+            }
         }
 
         composable(
-            route = "${AppDestinations.VIEW_DOCUMENT_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.DOCUMENT_ID_ARG}}/{${AppDestinations.DOCUMENT_URI_ARG}}/{${AppDestinations.DOCUMENT_TYPE_ARG}}/{${AppDestinations.DOCUMENT_TITLE_ARG}}",
+            route = "${AppDestinations.VIEW_DOCUMENT_ROUTE}/{${AppDestinations.DOCUMENT_ID_ARG}}/{${AppDestinations.DOCUMENT_URI_ARG}}/{${AppDestinations.DOCUMENT_TYPE_ARG}}/{${AppDestinations.DOCUMENT_TITLE_ARG}}",
             arguments = listOf(
-                navArgument(AppDestinations.MEMBER_ID_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_ID_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_URI_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_TYPE_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_TITLE_ARG) { type = NavType.StringType }
             )
         ) { backStackEntry ->
+            // Re-instantiate the ViewModel with the same factory to get the scoped instance
             val memberDetailsViewModel: MemberDetailsViewModel = viewModel(factory = MemberDetailsViewModel.Factory)
-
-            val memberId = backStackEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)
             val documentId = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_ID_ARG)
-            val documentUri = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_URI_ARG)?.decodeUri()
+            val documentPath = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_URI_ARG)?.decodeUri()
             val documentType = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_TYPE_ARG)
             val documentTitle = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_TITLE_ARG)?.decodeUri()
 
-            if (memberId != null && documentId != null && documentUri != null && documentType != null && documentTitle != null) {
+            if (documentId != null && documentPath != null && documentType != null && documentTitle != null) {
                 ViewDocumentScreen(
-                    memberId = memberId,
                     documentId = documentId,
+                    documentUriString = documentPath,
                     documentType = documentType,
                     documentTitle = documentTitle,
                     memberDetailsViewModel = memberDetailsViewModel,

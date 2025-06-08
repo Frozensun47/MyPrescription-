@@ -1,5 +1,6 @@
 package com.example.myprescription.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -7,10 +8,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.myprescription.ui.theme.AppBarLogo
+import com.example.myprescription.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,7 +43,14 @@ fun AboutScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            AppBarLogo()
+
+            Image(
+                painter = painterResource(id = R.drawable.app_logo_foreground),
+                contentDescription = "App Logo",
+                modifier = Modifier.size(120.dp),
+                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+            )
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
@@ -50,7 +60,6 @@ fun AboutScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
 
-            // You can get this from BuildConfig in a real app
             Text(
                 text = "Version 1.0",
                 style = MaterialTheme.typography.bodyLarge,
@@ -66,7 +75,7 @@ fun AboutScreen(
             )
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "© 2025 Your Company Name. All Rights Reserved.",
+                text = "© 2025 MyPrescription. All Rights Reserved.",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
