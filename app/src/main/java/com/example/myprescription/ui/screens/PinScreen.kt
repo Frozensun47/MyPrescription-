@@ -3,23 +3,14 @@ package com.example.myprescription.ui.screens
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.myprescription.ui.components.PinInput
 import kotlinx.coroutines.delay
 
 @Composable
@@ -35,6 +26,7 @@ fun PinScreen(
     // When an error occurs, trigger the shake animation
     LaunchedEffect(error) {
         if (error != null) {
+            pin = "" // Clear PIN on error
             shake = true
             delay(500) // Duration of shake
             shake = false
@@ -42,7 +34,7 @@ fun PinScreen(
     }
 
     val scale: Float by animateFloatAsState(
-        targetValue = if (shake) 1.1f else 1.0f,
+        targetValue = if (shake) 1.05f else 1.0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -54,7 +46,7 @@ fun PinScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp)
-                .systemBarsPadding(), // Ensures content is not behind status/navigation bars
+                .systemBarsPadding(),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -70,11 +62,10 @@ fun PinScreen(
             )
             Spacer(modifier = Modifier.height(48.dp))
 
-            PinInputField(
+            // Use the new, stable PinInput component
+            PinInput(
                 pin = pin,
-                onPinChange = {
-                    if (it.length <= 4) pin = it.filter { c -> c.isDigit() }
-                },
+                onPinChange = { pin = it },
                 isError = error != null,
                 modifier = Modifier.scale(scale)
             )
@@ -107,70 +98,6 @@ fun PinScreen(
                     .height(50.dp)
             ) {
                 Text(if (mode == PinScreenMode.SET) "Save and Continue" else "Unlock")
-            }
-        }
-    }
-}
-
-@Composable
-fun PinInputField(
-    pin: String,
-    onPinChange: (String) -> Unit,
-    isError: Boolean,
-    modifier: Modifier = Modifier,
-    pinLength: Int = 4
-) {
-    val focusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(Unit) {
-        delay(100) // Delay to allow UI to settle before requesting focus
-        focusRequester.requestFocus()
-    }
-
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center
-    ) {
-        // Hidden text field to handle input
-        BasicTextField(
-            value = pin,
-            onValueChange = onPinChange,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-            modifier = Modifier
-                .size(0.dp) // Make it invisible
-                .focusRequester(focusRequester),
-            cursorBrush = SolidColor(Color.Transparent) // Hide cursor
-        )
-
-        // Visible PIN boxes
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            repeat(pinLength) { index ->
-                val char = when {
-                    index < pin.length -> "●"
-                    else -> ""
-                }
-                val boxColor = if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
-
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .background(boxColor, shape = MaterialTheme.shapes.medium)
-                        .border(
-                            width = 1.dp,
-                            color = if (isError) MaterialTheme.colorScheme.error else Color.Transparent,
-                            shape = MaterialTheme.shapes.medium
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = char,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        textAlign = TextAlign.Center
-                    )
-                }
             }
         }
     }

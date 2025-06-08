@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.myprescription.ui.components.PinInput
 import com.example.myprescription.util.Prefs
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -241,13 +242,14 @@ fun VerifyPinDialog(onDismiss: () -> Unit, onConfirm: () -> Unit, correctPin: St
         onDismissRequest = onDismiss,
         title = { Text("Verify Your Identity") },
         text = {
-            Column {
-                Text("Please enter your current PIN to continue.")
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Please enter your current PIN to continue.", modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(16.dp))
-                PinInputField(
+                // Use the new, stable PinInput component
+                PinInput(
                     pin = enteredPin,
                     onPinChange = {
-                        if (it.length <= 4) enteredPin = it.filter { c -> c.isDigit() }
+                        if (it.length <= 4) enteredPin = it
                         error = null
                     },
                     isError = error != null
@@ -258,7 +260,6 @@ fun VerifyPinDialog(onDismiss: () -> Unit, onConfirm: () -> Unit, correctPin: St
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier
                             .padding(top = 8.dp)
-                            .align(Alignment.CenterHorizontally)
                     )
                 }
             }
@@ -270,6 +271,7 @@ fun VerifyPinDialog(onDismiss: () -> Unit, onConfirm: () -> Unit, correctPin: St
                         onConfirm()
                     } else {
                         error = "Incorrect PIN"
+                        enteredPin = "" // Clear PIN on error
                     }
                 },
                 enabled = enteredPin.length == 4
