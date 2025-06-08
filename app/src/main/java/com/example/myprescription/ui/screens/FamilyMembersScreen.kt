@@ -1,7 +1,6 @@
 package com.example.myprescription.ui.screens
 
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -118,7 +117,9 @@ fun FamilyMembersScreen(
             ) {
                 if (members.isEmpty()) {
                     Box(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -251,7 +252,13 @@ fun MemberCard(
                     Icon(Icons.Filled.Edit, contentDescription = "Edit Member", tint = MaterialTheme.colorScheme.secondary)
                 }
                 IconButton(onClick = onDeleteClick) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete Member", tint = MaterialTheme.colorScheme.error)
+                    // **THE CHANGE IS HERE**
+                    // The tint is now a more neutral color from the theme.
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "Delete Member",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -315,7 +322,9 @@ fun AddEditMemberDialog(
         Card(shape = RoundedCornerShape(16.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
                 ) {
                     Text(
                         text = if (memberToEdit == null) "Add New Member" else "Edit Member",
@@ -341,11 +350,18 @@ fun AddEditMemberDialog(
                                 painter = rememberAsyncImagePainter(ImageRequest.Builder(LocalContext.current).data(displayImage).build()),
                                 contentDescription = "Profile Photo",
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(100.dp).clip(CircleShape).clickable { profilePhotoPickerLauncher.launch("image/*") }
+                                modifier = Modifier
+                                    .size(100.dp)
+                                    .clip(CircleShape)
+                                    .clickable { profilePhotoPickerLauncher.launch("image/*") }
                             )
                         } else {
                             Box(
-                                modifier = Modifier.size(100.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer).clickable { profilePhotoPickerLauncher.launch("image/*") },
+                                modifier = Modifier
+                                    .size(100.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                                    .clickable { profilePhotoPickerLauncher.launch("image/*") },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Filled.AddAPhoto, "Add Profile Photo", tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(40.dp))
@@ -377,7 +393,7 @@ fun AddEditMemberDialog(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start
+                    horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                 }

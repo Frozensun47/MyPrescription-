@@ -1,6 +1,5 @@
 package com.example.myprescription.ui.screens
 
-import android.content.ActivityNotFoundException
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -20,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -51,22 +49,31 @@ import java.util.zip.ZipOutputStream
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ViewDocumentScreen(
+    memberId: String,
     documentId: String,
-    documentUriString: String,
     documentType: String,
     documentTitle: String,
     memberDetailsViewModel: MemberDetailsViewModel = viewModel(factory = MemberDetailsViewModel.Factory),
     onNavigateUp: () -> Unit
 ) {
+    // This LaunchedEffect loads the data needed for this screen's ViewModel instance
+    LaunchedEffect(memberId) {
+        memberDetailsViewModel.loadMemberData(memberId)
+    }
+
+    // Collect the flows into state variables at the top level of the composable.
+    val prescriptions by memberDetailsViewModel.prescriptions.collectAsState()
+    val reports by memberDetailsViewModel.reports.collectAsState()
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-
     var selectedFilePaths by remember { mutableStateOf<Set<String>>(emptySet()) }
     val isInSelectionMode = selectedFilePaths.isNotEmpty()
 
+    // Now, use the state variables directly, without accessing .value
     val latestDocument = when (documentType) {
-        "prescription" -> memberDetailsViewModel.prescriptions.collectAsState().value.find { it.id == documentId }?.imageUri
-        "report" -> memberDetailsViewModel.reports.collectAsState().value.find { it.id == documentId }?.fileUri
+        "prescription" -> prescriptions.find { it.id == documentId }?.imageUri
+        "report" -> reports.find { it.id == documentId }?.fileUri
         else -> ""
     } ?: ""
 
@@ -76,10 +83,12 @@ fun ViewDocumentScreen(
 
     var fileToDelete by remember { mutableStateOf<String?>(null) }
 
-    val initialNotes = remember(documentId, documentType) {
+    // The keys for remember are now the state lists themselves.
+    // This correctly recalculates initialNotes only when the lists change.
+    val initialNotes = remember(documentId, documentType, prescriptions, reports) {
         when (documentType) {
-            "prescription" -> memberDetailsViewModel.prescriptions.value.find { it.id == documentId }?.notes
-            "report" -> memberDetailsViewModel.reports.value.find { it.id == documentId }?.notes
+            "prescription" -> prescriptions.find { it.id == documentId }?.notes
+            "report" -> reports.find { it.id == documentId }?.notes
             else -> null
         } ?: ""
     }

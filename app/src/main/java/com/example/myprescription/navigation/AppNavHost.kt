@@ -17,8 +17,10 @@ import com.example.myprescription.ViewModel.FamilyViewModel
 import com.example.myprescription.ViewModel.MemberDetailsViewModel
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -58,12 +60,10 @@ fun AppNavHost(
     val user by authViewModel.user.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
-    // Determine the start destination based on the current user's state
     val startDestination = remember(user, user?.uid) {
         val currentUser = Firebase.auth.currentUser
         if (currentUser != null) {
             application.initializeDependenciesForUser(currentUser.uid)
-            // **CHANGE 1: If a PIN exists for the user, go to PIN entry. Otherwise, go to the main app screen.**
             if (prefs.getPin(currentUser.uid) != null) {
                 AppDestinations.PIN_ENTRY_ROUTE
             } else {
@@ -85,8 +85,6 @@ fun AppNavHost(
                     val loggedInUser = Firebase.auth.currentUser
                     if (loggedInUser != null) {
                         application.initializeDependenciesForUser(loggedInUser.uid)
-                        // **CHANGE 2: After login, go directly to the main screen.**
-                        // The user can set a PIN later from settings if they want.
                         navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) {
                             popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
                         }
@@ -110,7 +108,6 @@ fun AppNavHost(
                     onPinEntered = {}
                 )
             } else {
-                // Fallback if user is somehow null
                 navController.navigate(AppDestinations.LOGIN_ROUTE) {
                     popUpTo(navController.graph.id) { inclusive = true }
                 }
@@ -180,18 +177,21 @@ fun AppNavHost(
                     },
                     onDeleteAccount = {
                         coroutineScope.launch {
-                            val repository = application.repository
-                            if (repository != null) {
-                                val members = repository.getAllMembersOnce()
-                                for (member in members) {
-                                    member.profileImageUri?.let { File(it).delete() }
-                                    val prescriptions = repository.getPrescriptionsForMember(member.id).first()
-                                    prescriptions.forEach { p -> p.imageUri?.split(',')?.filter{it.isNotBlank()}?.forEach { path -> File(path).delete() } }
-                                    val reports = repository.getReportsForMember(member.id).first()
-                                    reports.forEach { r -> r.fileUri?.split(',')?.filter{it.isNotBlank()}?.forEach { path -> File(path).delete() } }
+                            withContext(Dispatchers.IO) {
+                                val repository = application.repository
+                                if (repository != null) {
+                                    val members = repository.getAllMembersOnce()
+                                    for (member in members) {
+                                        member.profileImageUri?.let { File(it).delete() }
+                                        val prescriptions = repository.getPrescriptionsForMember(member.id).first()
+                                        prescriptions.forEach { p -> p.imageUri?.split(',')?.filter{it.isNotBlank()}?.forEach { path -> File(path).delete() } }
+                                        val reports = repository.getReportsForMember(member.id).first()
+                                        reports.forEach { r -> r.fileUri?.split(',')?.filter{it.isNotBlank()}?.forEach { path -> File(path).delete() } }
+                                    }
+                                    repository.clearAllDatabaseTables()
                                 }
-                                repository.clearAllDatabaseTables()
                             }
+
                             Firebase.auth.currentUser?.delete()?.addOnCompleteListener {
                                 authViewModel.logout()
                                 application.onUserLogout()
@@ -222,40 +222,44 @@ fun AppNavHost(
                 navArgument(AppDestinations.MEMBER_NAME_ARG) { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val memberId = backStackEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)
-            val memberName = backStackEntry.arguments?.getString(AppDestinations.MEMBER_NAME_ARG)
+            val memberId = backStackEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)!!
+            val memberName = backStackEntry.arguments?.getString(AppDestinations.MEMBER_NAME_ARG)!!
+
             MemberDetailsScreen(
-                memberId = memberId!!,
-                memberName = memberName!!,
+                memberId = memberId,
+                memberName = memberName,
+                // THE FIX IS HERE: The lambda now correctly accepts 4 parameters
+                // to match the function definition you provided. The memberId from the
+                // outer scope is used to build the final navigation route.
                 onNavigateToViewDocument = { docId, docPath, docType, docTitle ->
-                    navController.navigate("${AppDestinations.VIEW_DOCUMENT_ROUTE}/$docId/${docPath.encodeUri()}/$docType/${docTitle.encodeUri()}")
+                    navController.navigate("${AppDestinations.VIEW_DOCUMENT_ROUTE}/$memberId/$docId/${docPath.encodeUri()}/$docType/${docTitle.encodeUri()}")
                 },
                 onNavigateUp = { navController.navigateUp() }
             )
         }
 
         composable(
-            route = "${AppDestinations.VIEW_DOCUMENT_ROUTE}/{${AppDestinations.DOCUMENT_ID_ARG}}/{${AppDestinations.DOCUMENT_URI_ARG}}/{${AppDestinations.DOCUMENT_TYPE_ARG}}/{${AppDestinations.DOCUMENT_TITLE_ARG}}",
+            route = "${AppDestinations.VIEW_DOCUMENT_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.DOCUMENT_ID_ARG}}/{${AppDestinations.DOCUMENT_URI_ARG}}/{${AppDestinations.DOCUMENT_TYPE_ARG}}/{${AppDestinations.DOCUMENT_TITLE_ARG}}",
             arguments = listOf(
+                navArgument(AppDestinations.MEMBER_ID_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_ID_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_URI_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_TYPE_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_TITLE_ARG) { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val parentEntry = remember(backStackEntry) {
-                navController.getBackStackEntry(memberDetailsRoute)
-            }
-            val memberDetailsViewModel: MemberDetailsViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = MemberDetailsViewModel.Factory)
+            val memberDetailsViewModel: MemberDetailsViewModel = viewModel(factory = MemberDetailsViewModel.Factory)
+
+            val memberId = backStackEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)
             val documentId = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_ID_ARG)
-            val documentPath = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_URI_ARG)?.decodeUri()
+            val documentUri = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_URI_ARG)?.decodeUri()
             val documentType = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_TYPE_ARG)
             val documentTitle = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_TITLE_ARG)?.decodeUri()
 
-            if (documentId != null && documentPath != null && documentType != null && documentTitle != null) {
+            if (memberId != null && documentId != null && documentUri != null && documentType != null && documentTitle != null) {
                 ViewDocumentScreen(
+                    memberId = memberId,
                     documentId = documentId,
-                    documentUriString = documentPath,
                     documentType = documentType,
                     documentTitle = documentTitle,
                     memberDetailsViewModel = memberDetailsViewModel,
