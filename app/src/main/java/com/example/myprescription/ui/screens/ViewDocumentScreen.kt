@@ -12,15 +12,23 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
@@ -31,47 +39,45 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.myprescription.ViewModel.MemberDetailsViewModel
 import com.example.myprescription.util.saveFileToInternalStorage
-import java.io.File
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
+import kotlin.math.abs
 
-// Data class to hold the state for the image viewer
 private data class ImageViewerState(val filePaths: List<String>, val initialIndex: Int)
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ViewDocumentScreen(
-    memberId: String,
     documentId: String,
-    documentUriString: String,
     documentType: String,
     documentTitle: String,
-    memberDetailsViewModel: MemberDetailsViewModel = viewModel(factory = MemberDetailsViewModel.Factory),
+    memberDetailsViewModel: MemberDetailsViewModel,
     onNavigateUp: () -> Unit
 ) {
-    LaunchedEffect(memberId) {
-        memberDetailsViewModel.loadMemberData(memberId)
-    }
-
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var selectedFilePaths by remember { mutableStateOf<Set<String>>(emptySet()) }
     val isInSelectionMode = selectedFilePaths.isNotEmpty()
     var imageViewerState by remember { mutableStateOf<ImageViewerState?>(null) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     val latestDocument by remember(documentType, documentId) {
         derivedStateOf {
@@ -89,8 +95,6 @@ fun ViewDocumentScreen(
         }
     }
 
-    var fileToDelete by remember { mutableStateOf<String?>(null) }
-
     val initialNotes by remember(documentId, documentType) {
         derivedStateOf {
             when (documentType) {
@@ -102,53 +106,32 @@ fun ViewDocumentScreen(
     }
     var notesText by remember(initialNotes) { mutableStateOf(initialNotes) }
 
+    LaunchedEffect(notesText) {
+        if (notesText != initialNotes) {
+            delay(1000L)
+            if (documentType == "prescription") {
+                memberDetailsViewModel.updatePrescriptionNotes(documentId, notesText)
+            } else if (documentType == "report") {
+                memberDetailsViewModel.updateReportNotes(documentId, notesText)
+            }
+        }
+    }
+
     val importImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri> ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         coroutineScope.launch {
-            val newPaths = mutableListOf<String>()
-            for(uri in uris) {
-                val filePath = saveFileToInternalStorage(context, uri, "prescription")
-                if(filePath.isNotBlank()) {
-                    newPaths.add(filePath)
-                }
+            val newPaths = uris.mapNotNull { uri ->
+                saveFileToInternalStorage(context, uri, "prescription").takeIf { it.isNotBlank() }
             }
+
             if (newPaths.isNotEmpty()) {
-                val currentPaths = filePaths
-                val allPaths = (currentPaths + newPaths).joinToString(",")
-                if (documentType == "prescription") {
-                    memberDetailsViewModel.updatePrescriptionImageUris(documentId, allPaths)
-                }
+                val allPaths = (filePaths + newPaths).joinToString(",")
+                memberDetailsViewModel.updatePrescriptionImageUris(documentId, allPaths)
                 Toast.makeText(context, "${newPaths.size} image(s) imported!", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(context, "Error importing image(s).", Toast.LENGTH_SHORT).show()
             }
         }
-    }
-
-    fun shareFiles(paths: List<String>) {
-        if (paths.isEmpty()) return
-
-        val urisToShare = ArrayList<Uri>()
-        for (path in paths) {
-            val file = File(path)
-            if (file.exists()) {
-                val authority = "${context.packageName}.provider"
-                val uri = FileProvider.getUriForFile(context, authority, file)
-                urisToShare.add(uri)
-            }
-        }
-
-        if (urisToShare.isNotEmpty()) {
-            val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                type = "*/*"
-                putParcelableArrayListExtra(Intent.EXTRA_STREAM, urisToShare)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(Intent.createChooser(shareIntent, "Share Files via..."))
-        } else {
-            Toast.makeText(context, "No valid files found to share.", Toast.LENGTH_SHORT).show()
-        }
-        selectedFilePaths = emptySet()
     }
 
     Scaffold(
@@ -170,97 +153,87 @@ fun ViewDocumentScreen(
                     }
                 },
                 actions = {
-                    val pathsToActOn = if (isInSelectionMode) selectedFilePaths.toList() else filePaths
-                    if (pathsToActOn.isNotEmpty()) {
-                        IconButton(onClick = { /* TODO: Download Logic */ }) {
-                            Icon(Icons.Default.Download, "Download")
-                        }
-                        IconButton(onClick = { shareFiles(pathsToActOn) }) {
-                            Icon(Icons.Default.Share, "Share")
-                        }
+                    if (isInSelectionMode) {
+                        IconButton(onClick = { /* Share Logic */ }) { Icon(Icons.Default.Share, "Share") }
+                        IconButton(onClick = { /* Download Logic */ }) { Icon(Icons.Default.Download, "Download") }
+                        IconButton(onClick = { showDeleteConfirmation = true }) { Icon(Icons.Default.Delete, "Delete") }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (isInSelectionMode) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
-                )
-            )
-        },
-        floatingActionButton = {
-            if (documentType == "prescription" && !isInSelectionMode) {
-                FloatingActionButton(onClick = { importImageLauncher.launch("image/*") }) {
-                    Icon(Icons.Filled.AddPhotoAlternate, "Import Image")
                 }
-            }
+            )
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
-            if (filePaths.isEmpty()) {
-                val emptyMessage = if (documentType == "prescription") "No images have been added yet. Tap the '+' button to add one." else "No files have been added yet."
-                EmptyStateView(emptyMessage)
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(filePaths, key = { it }) { path ->
-                        DocumentItemCard(
-                            filePath = path,
-                            documentType = documentType,
-                            isSelected = path in selectedFilePaths,
-                            isInSelectionMode = isInSelectionMode,
-                            onItemClick = {
-                                if (isInSelectionMode) {
-                                    selectedFilePaths = if (path in selectedFilePaths) selectedFilePaths - path else selectedFilePaths + path
-                                } else {
-                                    if (documentType == "prescription") {
-                                        val clickedIndex = filePaths.indexOf(path)
-                                        if (clickedIndex != -1) {
-                                            imageViewerState = ImageViewerState(filePaths, clickedIndex)
-                                        }
+            Column(Modifier.fillMaxSize()) {
+                if (filePaths.isEmpty()) {
+                    val emptyMessage = if (documentType == "prescription") "No images have been added yet. Tap the '+' button to add one." else "No files have been added yet."
+                    EmptyStateView(emptyMessage, modifier = Modifier.weight(1f))
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 120.dp),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        itemsIndexed(filePaths, key = { _, path -> path }) { index, path ->
+                            DocumentGridItem(
+                                filePath = path,
+                                documentType = documentType,
+                                displayName = if (documentType == "prescription") "Image ${index + 1}" else "File ${index + 1}",
+                                isSelected = path in selectedFilePaths,
+                                onClick = {
+                                    if (isInSelectionMode) {
+                                        selectedFilePaths = if (path in selectedFilePaths) selectedFilePaths - path else selectedFilePaths + path
                                     } else {
-                                        openFile(context, path)
+                                        if (documentType == "prescription") {
+                                            imageViewerState = ImageViewerState(filePaths, index)
+                                        } else {
+                                            openFile(context, path)
+                                        }
                                     }
+                                },
+                                onLongClick = {
+                                    selectedFilePaths += path
                                 }
-                            },
-                            onItemLongClick = { selectedFilePaths += path },
-                            onDeleteClick = { fileToDelete = path }
-                        )
+                            )
+                        }
                     }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp))
+                        .padding(16.dp)
+                ) {
+                    Text("Notes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = notesText,
+                        onValueChange = { notesText = it },
+                        label = { Text("Add or edit notes here...") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(130.dp)
+                            .verticalScroll(rememberScrollState()),
+                        shape = MaterialTheme.shapes.medium
+                    )
                 }
             }
 
-            // Notes Section
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp))
-                    .padding(16.dp)
-            ) {
-                Text("Notes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = notesText,
-                    onValueChange = { notesText = it },
-                    label = { Text("Add or edit notes here...") },
+            if (documentType == "prescription" && !isInSelectionMode) {
+                FloatingActionButton(
+                    onClick = { importImageLauncher.launch("image/*") },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 100.dp),
-                    shape = MaterialTheme.shapes.medium
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        if (documentType == "prescription") memberDetailsViewModel.updatePrescriptionNotes(documentId, notesText)
-                        else if (documentType == "report") memberDetailsViewModel.updateReportNotes(documentId, notesText)
-                        Toast.makeText(context, "Notes Saved!", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.align(Alignment.End)
-                ) { Text("Save Notes") }
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 180.dp)
+                ) {
+                    Icon(Icons.Filled.AddPhotoAlternate, "Import Image")
+                }
             }
         }
     }
@@ -279,22 +252,24 @@ fun ViewDocumentScreen(
         }
     }
 
-    if (fileToDelete != null) {
+    if (showDeleteConfirmation) {
         AlertDialog(
-            onDismissRequest = { fileToDelete = null },
-            title = { Text("Delete File?") },
-            text = { Text("Are you sure you want to delete this file permanently?") },
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Delete ${selectedFilePaths.size} file(s)?") },
+            text = { Text("This action cannot be undone.") },
             confirmButton = {
                 Button(
                     onClick = {
-                        if (documentType == "prescription") memberDetailsViewModel.deleteFileFromPrescription(documentId, fileToDelete!!)
-                        else memberDetailsViewModel.deleteFileFromReport(documentId, fileToDelete!!)
-                        fileToDelete = null
+                        memberDetailsViewModel.deleteMultipleFiles(documentId, documentType, selectedFilePaths)
+                        selectedFilePaths = emptySet()
+                        showDeleteConfirmation = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) { Text("Delete") }
             },
-            dismissButton = { OutlinedButton(onClick = { fileToDelete = null }) { Text("Cancel") } }
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancel") }
+            }
         )
     }
 }
@@ -321,80 +296,72 @@ private fun openFile(context: android.content.Context, filePath: String) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DocumentItemCard(
+private fun DocumentGridItem(
     filePath: String,
     documentType: String,
+    displayName: String,
     isSelected: Boolean,
-    isInSelectionMode: Boolean,
-    onItemClick: () -> Unit,
-    onItemLongClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
-    val file = remember { File(filePath) }
-
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .aspectRatio(1f)
+            .clip(MaterialTheme.shapes.large)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+        border = if (isSelected) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else null
     ) {
-        Row(
-            modifier = Modifier
-                .combinedClickable(
-                    onClick = onItemClick,
-                    onLongClick = onItemLongClick
+        Box(contentAlignment = Alignment.BottomStart) {
+            if (documentType == "prescription") {
+                Image(
+                    painter = rememberAsyncImagePainter(
+                        ImageRequest.Builder(LocalContext.current).data(File(filePath)).crossfade(true).build()
+                    ),
+                    contentDescription = displayName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
                 )
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                if (documentType == "prescription") {
-                    Image(
-                        painter = rememberAsyncImagePainter(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(file)
-                                .crossfade(true)
-                                .build()
-                        ),
-                        contentDescription = file.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(
                         Icons.AutoMirrored.Filled.InsertDriveFile,
-                        "File Icon",
-                        modifier = Modifier.size(40.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (isSelected) {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-                    )
-                    Icon(
-                        Icons.Filled.CheckCircle,
-                        "Selected",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.align(Alignment.Center)
+                        contentDescription = "File Icon",
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
-            Text(file.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
-            IconButton(onClick = onDeleteClick) {
-                Icon(Icons.Default.DeleteOutline, "Delete File", tint = MaterialTheme.colorScheme.error)
+
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))))
+            )
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(12.dp)
+            )
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.CheckCircle, "Selected", tint = Color.White)
+                }
             }
         }
     }
@@ -409,84 +376,149 @@ private fun ImagePager(
     onDismiss: () -> Unit
 ) {
     val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { filePaths.size })
+    var isZoomed by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
                 .systemBarsPadding()
         ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                beyondBoundsPageCount = 1 // Pre-load adjacent images
-            ) { page ->
-                val filePath = filePaths.getOrNull(page)
-                if (filePath != null) {
-                    ZoomableImage(imagePath = filePath)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${pagerState.currentPage + 1} / ${filePaths.size}",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, "Close", tint = Color.White)
                 }
             }
 
-            // Top aligned close button
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-            ) {
-                Icon(Icons.Default.Close, "Close", tint = Color.White)
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f),
+                userScrollEnabled = !isZoomed,
+                beyondBoundsPageCount = 1
+            ) { page ->
+                val filePath = filePaths.getOrNull(page)
+                if (filePath != null) {
+                    ZoomableImage(
+                        imagePath = filePath,
+                        onZoomChanged = { isZoomed = it }
+                    )
+                }
             }
 
-            // Bottom aligned page indicator
-            Text(
-                text = "${pagerState.currentPage + 1} / ${filePaths.size}",
-                color = Color.White,
-                style = MaterialTheme.typography.bodyLarge,
+            LazyRow(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp)
-            )
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                horizontalArrangement = Arrangement.Center,
+                contentPadding = PaddingValues(horizontal = 8.dp)
+            ) {
+                itemsIndexed(filePaths) { index, filePath ->
+                    val isSelected = pagerState.currentPage == index
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .padding(4.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(
+                                width = if (isSelected) 2.dp else 0.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                            }
+                    ) {
+                        Image(
+                            painter = rememberAsyncImagePainter(
+                                ImageRequest.Builder(LocalContext.current).data(File(filePath)).crossfade(true).build()
+                            ),
+                            contentDescription = "Thumbnail ${index + 1}",
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun ZoomableImage(imagePath: String) {
+private fun ZoomableImage(
+    imagePath: String,
+    onZoomChanged: (Boolean) -> Unit
+) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
 
-    val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
-        scale = (scale * zoomChange).coerceAtLeast(1f) // Prevent zooming out
-        offset += offsetChange
-    }
-
-    // Reset the image's state when a new image is composed
     LaunchedEffect(imagePath) {
         scale = 1f
         offset = Offset.Zero
+        onZoomChanged(false)
     }
 
-    Image(
-        painter = rememberAsyncImagePainter(
-            ImageRequest.Builder(LocalContext.current)
-                .data(File(imagePath))
-                .crossfade(true)
-                .build()
-        ),
-        contentDescription = "Full screen image",
-        contentScale = ContentScale.Fit,
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .transformable(state = transformableState)
-            .graphicsLayer(
-                scaleX = scale,
-                scaleY = scale,
-                translationX = offset.x,
-                translationY = offset.y
-            )
-    )
+            .clip(RectangleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        val density = LocalDensity.current
+        val boxWidth = with(density) { maxWidth.toPx() }
+        val boxHeight = with(density) { maxHeight.toPx() }
+
+        val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+            val newScale = (scale * zoomChange).coerceAtLeast(1f)
+            onZoomChanged(newScale > 1f)
+
+            val newOffset = if (newScale > 1f) {
+                val maxOffsetX = (boxWidth * (newScale - 1)) / 2f
+                val maxOffsetY = (boxHeight * (newScale - 1)) / 2f
+                (offset + panChange).let {
+                    Offset(
+                        x = it.x.coerceIn(-abs(maxOffsetX), abs(maxOffsetX)),
+                        y = it.y.coerceIn(-abs(maxOffsetY), abs(maxOffsetY))
+                    )
+                }
+            } else {
+                Offset.Zero
+            }
+
+            scale = newScale
+            offset = newOffset
+        }
+
+        Image(
+            painter = rememberAsyncImagePainter(
+                ImageRequest.Builder(LocalContext.current).data(File(imagePath)).crossfade(true).build()
+            ),
+            contentDescription = "Full screen image",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .transformable(state = transformState)
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offset.x,
+                    translationY = offset.y
+                )
+        )
+    }
 }

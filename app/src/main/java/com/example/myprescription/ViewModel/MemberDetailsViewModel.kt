@@ -218,4 +218,33 @@ class MemberDetailsViewModel(application: Application, private val repository: A
             }
         }
     }
+    fun deleteMultipleFiles(documentId: String, documentType: String, pathsToDelete: Set<String>) {
+        viewModelScope.launch {
+            val updatedPaths: String
+            if (documentType == "prescription") {
+                val prescription = prescriptions.value.find { it.id == documentId } ?: return@launch
+                updatedPaths = prescription.imageUri
+                    ?.split(',')
+                    ?.filter { it.isNotBlank() && it !in pathsToDelete }
+                    ?.joinToString(",") ?: ""
+                repository.updatePrescription(prescription.copy(imageUri = updatedPaths))
+            } else {
+                val report = reports.value.find { it.id == documentId } ?: return@launch
+                updatedPaths = report.fileUri
+                    ?.split(',')
+                    ?.filter { it.isNotBlank() && it !in pathsToDelete }
+                    ?.joinToString(",") ?: ""
+                repository.updateReport(report.copy(fileUri = updatedPaths))
+            }
+
+            // Delete files from storage
+            pathsToDelete.forEach { path ->
+                try {
+                    File(path).delete()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
 }

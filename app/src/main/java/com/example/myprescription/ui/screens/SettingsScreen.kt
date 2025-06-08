@@ -49,67 +49,67 @@ fun SettingsScreen(
             )
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
-            SettingsSectionTitle("Security")
-            SettingsItem(
-                title = "Enable PIN Lock",
-                subtitle = if (isPinEnabled) "PIN is enabled" else "PIN is disabled",
-                icon = Icons.Default.Lock,
-                onClick = {
-                    val newState = !isPinEnabled
-                    if (!newState) {
-                        prefs.setPinEnabled(userId, false)
-                        isPinEnabled = false
-                    } else {
-                        onNavigateToChangePin()
-                    }
-                },
-                trailingContent = {
-                    Switch(
-                        checked = isPinEnabled,
-                        onCheckedChange = { newState ->
-                            if (!newState) {
-                                prefs.setPinEnabled(userId, false)
-                                isPinEnabled = false
-                            } else {
-                                onNavigateToChangePin()
-                            }
+        // FIX: Wrapped content in a Surface to ensure it has a background
+        Surface(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                SettingsSectionTitle("Security")
+                SettingsItem(
+                    title = "Enable PIN Lock",
+                    subtitle = if (isPinEnabled) "PIN is enabled" else "PIN is disabled",
+                    icon = Icons.Default.Lock,
+                    onClick = {
+                        if (isPinEnabled) {
+                            prefs.setPinEnabled(userId, false)
+                            isPinEnabled = false
+                        } else {
+                            onNavigateToChangePin()
                         }
-                    )
-                }
-            )
-            SettingsItem(
-                title = "Change PIN",
-                icon = Icons.Default.Key,
-                enabled = isPinEnabled, // Can only change if PIN is enabled
-                onClick = {
-                    if (prefs.isPinEnabled(userId)) {
-                        showVerifyPinDialog = true
-                    } else {
-                        onNavigateToChangePin()
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = isPinEnabled,
+                            onCheckedChange = { newState ->
+                                if (!newState) {
+                                    prefs.setPinEnabled(userId, false)
+                                    isPinEnabled = false
+                                } else {
+                                    onNavigateToChangePin()
+                                }
+                            }
+                        )
                     }
-                }
-            )
+                )
+                SettingsItem(
+                    title = "Change PIN",
+                    icon = Icons.Default.Key,
+                    enabled = isPinEnabled,
+                    onClick = {
+                        if (prefs.isPinEnabled(userId)) {
+                            showVerifyPinDialog = true
+                        } else {
+                            onNavigateToChangePin()
+                        }
+                    }
+                )
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp))
 
-            SettingsSectionTitle("Account")
-            SettingsItem(
-                title = "Logout",
-                icon = Icons.AutoMirrored.Filled.Logout,
-                onClick = onLogout
-            )
-            SettingsItem(
-                title = "Delete Account",
-                subtitle = "This action is permanent",
-                icon = Icons.Default.DeleteForever,
-                isDestructive = true,
-                onClick = { showDeleteDialog = true }
-            )
+                SettingsSectionTitle("Account")
+                SettingsItem(
+                    title = "Logout",
+                    icon = Icons.AutoMirrored.Filled.Logout,
+                    onClick = onLogout
+                )
+                SettingsItem(
+                    title = "Delete Account",
+                    subtitle = "This action is permanent",
+                    icon = Icons.Default.DeleteForever,
+                    isDestructive = true,
+                    onClick = { showDeleteDialog = true }
+                )
+            }
         }
     }
 

@@ -42,7 +42,7 @@ fun MemberDetailsScreen(
     memberId: String,
     memberName: String,
     memberDetailsViewModel: MemberDetailsViewModel,
-    onNavigateToViewDocument: (documentId: String, documentPath: String, documentType: String, documentTitle: String) -> Unit,
+    onNavigateToViewDocument: (documentId: String, documentType: String, documentTitle: String) -> Unit,
     onNavigateUp: () -> Unit
 ) {
     val prescriptions by memberDetailsViewModel.prescriptions.collectAsState()
@@ -126,7 +126,7 @@ fun MemberDetailsScreen(
                             memberDetailsViewModel.setTargetPrescriptionForUpload(it.id)
                             prescriptionImagePicker.launch("image/*")
                         },
-                        onViewClick = { p -> p.imageUri?.let { onNavigateToViewDocument(p.id, it, "prescription", "Dr. ${p.doctorName}'s P.") } },
+                        onViewClick = { p -> if (p.imageUri?.isNotBlank() == true) onNavigateToViewDocument(p.id, "prescription", "Dr. ${p.doctorName}'s P.") },
                         onDeleteClick = { itemToDelete = it },
                         onEditClick = { memberDetailsViewModel.onEditPrescriptionClicked(it) }
                     )
@@ -136,7 +136,7 @@ fun MemberDetailsScreen(
                             memberDetailsViewModel.setTargetReportForUpload(it.id)
                             reportFilePicker.launch("*/*")
                         },
-                        onViewClick = { r -> r.fileUri?.let { onNavigateToViewDocument(r.id, it, "report", r.reportName) } },
+                        onViewClick = { r -> if (r.fileUri?.isNotBlank() == true) onNavigateToViewDocument(r.id, "report", r.reportName) },
                         onDeleteClick = { itemToDelete = it },
                         onEditClick = { memberDetailsViewModel.onEditReportClicked(it) }
                     )
@@ -436,9 +436,9 @@ fun formatDate(date: Date): String {
 }
 
 @Composable
-fun EmptyStateView(message: String) {
+fun EmptyStateView(message: String, modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(16.dp), contentAlignment = Alignment.Center
     ) {
