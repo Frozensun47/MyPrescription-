@@ -15,26 +15,30 @@ class Prefs(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    var pin: String?
-        get() = sharedPreferences.getString("USER_PIN", null)
-        set(value) {
-            sharedPreferences.edit().putString("USER_PIN", value).apply()
-        }
+    // Functions now take userId to store PINs per-account
+    fun getPin(userId: String): String? {
+        return sharedPreferences.getString("USER_PIN_$userId", null)
+    }
 
-    // New property to control PIN screen visibility
-    var isPinEnabled: Boolean
-        get() = sharedPreferences.getBoolean("IS_PIN_ENABLED", true) // Default to true
-        set(value) {
-            sharedPreferences.edit().putBoolean("IS_PIN_ENABLED", value).apply()
-        }
+    fun setPin(userId: String, pin: String) {
+        sharedPreferences.edit().putString("USER_PIN_$userId", pin).apply()
+    }
 
-    var isUserLoggedIn: Boolean
-        get() = sharedPreferences.getBoolean("IS_LOGGED_IN", false)
-        set(value) {
-            sharedPreferences.edit().putBoolean("IS_LOGGED_IN", value).apply()
-        }
+    fun isPinEnabled(userId: String): Boolean {
+        // If a user has a PIN, the feature is implicitly enabled for them.
+        // We can default to false if no pin is set.
+        return sharedPreferences.contains("USER_PIN_$userId")
+    }
 
-    fun clear() {
+    fun setPinEnabled(userId: String, isEnabled: Boolean) {
+        // Instead of a separate flag, we remove the pin to disable it.
+        if (!isEnabled) {
+            sharedPreferences.edit().remove("USER_PIN_$userId").apply()
+        }
+        // Enabling is handled by setting a new PIN.
+    }
+
+    fun clearAllData() {
         sharedPreferences.edit().clear().apply()
     }
 }

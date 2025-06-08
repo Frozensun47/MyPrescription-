@@ -1,7 +1,6 @@
 package com.example.myprescription.ViewModel
 
 import android.app.Application
-import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
@@ -19,6 +18,8 @@ import java.io.InputStream
 
 class FamilyViewModel(application: Application, private val repository: AppRepository) : AndroidViewModel(application) {
 
+    // ... (rest of the ViewModel is unchanged) ...
+
     val members: StateFlow<List<Member>> = repository.getAllMembers()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -28,7 +29,7 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
     private val _editingMember = MutableStateFlow<Member?>(null)
     val editingMember: StateFlow<Member?> = _editingMember.asStateFlow()
 
-    private suspend fun saveImageToInternalStorage(context: Context, uri: Uri, memberId: String): String? {
+    private suspend fun saveImageToInternalStorage(context: android.content.Context, uri: Uri, memberId: String): String? {
         return try {
             val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
             val fileName = "profile_${memberId}_${System.currentTimeMillis()}.jpg"
@@ -64,14 +65,9 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
             if (profilePhotoUri != null && profilePhotoUri.toString() != memberData.profileImageUri /* Only save if new URI */) {
                 val imagePath = saveImageToInternalStorage(getApplication(), profilePhotoUri, memberData.id)
                 if (imagePath != null) {
-                    // TODO: Optionally delete the old profile image file from internal storage
-                    // if (memberData.profileImageUri != null && memberData.profileImageUri != imagePath) { File(memberData.profileImageUri).delete() }
                     finalMember = memberData.copy(profileImageUri = imagePath)
                 }
             } else if (profilePhotoUri == null && memberData.profileImageUri != null) {
-                // This case handles if the user explicitly wants to remove the photo
-                // TODO: Optionally delete the old profile image file from internal storage
-                // if (memberData.profileImageUri != null) { File(memberData.profileImageUri).delete() }
                 finalMember = memberData.copy(profileImageUri = null)
             }
             repository.updateMember(finalMember)
@@ -104,6 +100,7 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
         _editingMember.value = null
     }
 
+
     companion object {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -111,10 +108,12 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
                 modelClass: Class<T>,
                 extras: CreationExtras
             ): T {
-                val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
+                val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) as MyPrescriptionApplication
+                // The repository is now retrieved from the application instance, which holds the user-specific version.
+                val repository = application.repository ?: throw IllegalStateException("Repository not initialized, user must be logged in.")
                 return FamilyViewModel(
                     application,
-                    (application as MyPrescriptionApplication).repository
+                    repository
                 ) as T
             }
         }

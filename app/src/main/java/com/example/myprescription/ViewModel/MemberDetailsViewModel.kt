@@ -1,7 +1,6 @@
 package com.example.myprescription.ViewModel
 
 import android.app.Application
-import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.AndroidViewModel
@@ -22,6 +21,7 @@ import java.util.Date
 
 class MemberDetailsViewModel(application: Application, private val repository: AppRepository) : AndroidViewModel(application) {
 
+    // ... (rest of the ViewModel is unchanged) ...
     private val _currentMemberId = MutableStateFlow<String?>(null)
 
     val prescriptions: StateFlow<List<Prescription>> = _currentMemberId.flatMapLatest { memberId ->
@@ -40,7 +40,6 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // --- Dialog States ---
     private val _showAddPrescriptionDialog = MutableStateFlow(false)
     val showAddPrescriptionDialog: StateFlow<Boolean> = _showAddPrescriptionDialog.asStateFlow()
 
@@ -53,7 +52,6 @@ class MemberDetailsViewModel(application: Application, private val repository: A
     private val _editingReport = MutableStateFlow<Report?>(null)
     val editingReport: StateFlow<Report?> = _editingReport.asStateFlow()
 
-    // --- Upload Targets ---
     private val _targetPrescriptionIdForUpload = MutableStateFlow<String?>(null)
     private val _targetReportIdForUpload = MutableStateFlow<String?>(null)
 
@@ -61,7 +59,7 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         _currentMemberId.value = memberId
     }
 
-    private suspend fun saveFileToInternalStorage(context: Context, uri: Uri, type: String, itemId: String): String? {
+    private suspend fun saveFileToInternalStorage(context: android.content.Context, uri: Uri, type: String, itemId: String): String? {
         return try {
             val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
             val mimeType = context.contentResolver.getType(uri)
@@ -78,8 +76,6 @@ class MemberDetailsViewModel(application: Application, private val repository: A
             null
         }
     }
-
-    // --- CRUD Operations ---
 
     fun addPrescription(prescriptionData: Prescription) {
         viewModelScope.launch {
@@ -202,7 +198,6 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         }
     }
 
-    // --- Restored Notes Functions ---
     fun updatePrescriptionNotes(prescriptionId: String, newNotes: String) {
         viewModelScope.launch {
             val prescription = prescriptions.value.find { it.id == prescriptionId } ?: return@launch
@@ -217,7 +212,6 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         }
     }
 
-    // --- Dialog Controls ---
     fun onAddPrescriptionClicked() { _showAddPrescriptionDialog.value = true }
     fun onAddReportClicked() { _showAddReportDialog.value = true }
     fun onEditPrescriptionClicked(prescription: Prescription) { _editingPrescription.value = prescription }
@@ -233,8 +227,10 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
-                val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
-                return MemberDetailsViewModel(application, (application as MyPrescriptionApplication).repository) as T
+                val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) as MyPrescriptionApplication
+                // The repository is now retrieved from the application instance.
+                val repository = application.repository ?: throw IllegalStateException("Repository not initialized, user must be logged in.")
+                return MemberDetailsViewModel(application, repository) as T
             }
         }
     }

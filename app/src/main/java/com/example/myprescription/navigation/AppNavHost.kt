@@ -9,6 +9,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.myprescription.MyPrescriptionApplication
 import com.example.myprescription.ui.screens.*
 import com.example.myprescription.util.Prefs
 import com.example.myprescription.ViewModel.AuthViewModel
@@ -16,6 +17,9 @@ import com.example.myprescription.ViewModel.FamilyViewModel
 import com.example.myprescription.ViewModel.MemberDetailsViewModel
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import java.io.File
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -48,15 +52,23 @@ fun AppNavHost(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val application = context.applicationContext as MyPrescriptionApplication
     val prefs = remember { Prefs(context) }
     val authViewModel: AuthViewModel = viewModel()
     val user by authViewModel.user.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
 
-    val startDestination = remember(user) {
-        when {
-            user == null -> AppDestinations.LOGIN_ROUTE
-            prefs.pin == null -> AppDestinations.PIN_SETUP_ROUTE
-            else -> AppDestinations.PIN_ENTRY_ROUTE
+    val startDestination = remember(user, user?.uid) {
+        val currentUser = Firebase.auth.currentUser
+        if (currentUser != null) {
+            application.initializeDependenciesForUser(currentUser.uid)
+            if (prefs.getPin(currentUser.uid) == null) {
+                AppDestinations.PIN_SETUP_ROUTE
+            } else {
+                AppDestinations.PIN_ENTRY_ROUTE
+            }
+        } else {
+            AppDestinations.LOGIN_ROUTE
         }
     }
 
@@ -66,43 +78,69 @@ fun AppNavHost(
         modifier = modifier
     ) {
         composable(AppDestinations.LOGIN_ROUTE) {
-            LoginScreen(onLoginSuccess = {
-                navController.navigate(AppDestinations.PIN_SETUP_ROUTE) {
-                    popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
+            LoginScreen(
+                onLoginSuccess = {
+                    val loggedInUser = Firebase.auth.currentUser
+                    if (loggedInUser != null) {
+                        application.initializeDependenciesForUser(loggedInUser.uid)
+                        if (prefs.getPin(loggedInUser.uid) == null) {
+                            navController.navigate(AppDestinations.PIN_SETUP_ROUTE) {
+                                popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
+                            }
+                        } else {
+                            navController.navigate(AppDestinations.PIN_ENTRY_ROUTE) {
+                                popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
+                            }
+                        }
+                    }
                 }
-            })
+            )
         }
 
         composable(AppDestinations.PIN_SETUP_ROUTE) {
-            PinScreen(
-                mode = PinScreenMode.SET,
-                error = null,
-                onPinSet = { pin ->
-                    prefs.pin = pin
-                    navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) {
-                        popUpTo(AppDestinations.PIN_SETUP_ROUTE) { inclusive = true }
-                    }
-                },
-                onPinEntered = {}
-            )
+            val currentUser = Firebase.auth.currentUser
+            if (currentUser != null) {
+                PinScreen(
+                    mode = PinScreenMode.SET,
+                    error = null,
+                    onPinSet = { pin ->
+                        prefs.setPin(currentUser.uid, pin)
+                        navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                        }
+                    },
+                    onPinEntered = {}
+                )
+            } else {
+                navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                    popUpTo(navController.graph.id) { inclusive = true }
+                }
+            }
         }
 
         composable(AppDestinations.PIN_ENTRY_ROUTE) {
-            var error by remember { mutableStateOf<String?>(null) }
-            PinScreen(
-                mode = PinScreenMode.ENTER,
-                error = error,
-                onPinSet = {},
-                onPinEntered = { pin ->
-                    if (pin == prefs.pin) {
-                        navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) {
-                            popUpTo(AppDestinations.PIN_ENTRY_ROUTE) { inclusive = true }
+            val currentUser = Firebase.auth.currentUser
+            if (currentUser != null) {
+                var error by remember { mutableStateOf<String?>(null) }
+                PinScreen(
+                    mode = PinScreenMode.ENTER,
+                    error = error,
+                    onPinSet = {},
+                    onPinEntered = { pin ->
+                        if (pin == prefs.getPin(currentUser.uid)) {
+                            navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) {
+                                popUpTo(AppDestinations.PIN_ENTRY_ROUTE) { inclusive = true }
+                            }
+                        } else {
+                            error = "Incorrect PIN"
                         }
-                    } else {
-                        error = "Incorrect PIN"
                     }
+                )
+            } else {
+                navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                    popUpTo(navController.graph.id) { inclusive = true }
                 }
-            )
+            }
         }
 
         composable(AppDestinations.FAMILY_MEMBERS_ROUTE) {
@@ -117,12 +155,56 @@ fun AppNavHost(
                 onNavigateToAbout = { navController.navigate(AppDestinations.ABOUT_ROUTE) },
                 onChangeAccountClick = {
                     authViewModel.logout()
-                    prefs.clear()
+                    application.onUserLogout()
                     navController.navigate(AppDestinations.LOGIN_ROUTE) {
                         popUpTo(0) { inclusive = true }
                     }
                 }
             )
+        }
+
+        composable(AppDestinations.SETTINGS_ROUTE) {
+            val currentUser = Firebase.auth.currentUser
+            if (currentUser != null) {
+                SettingsScreen(
+                    userId = currentUser.uid,
+                    onNavigateUp = { navController.navigateUp() },
+                    onNavigateToChangePin = {
+                        navController.navigate(AppDestinations.PIN_SETUP_ROUTE)
+                    },
+                    onLogout = {
+                        authViewModel.logout()
+                        application.onUserLogout()
+                        navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onDeleteAccount = {
+                        coroutineScope.launch {
+                            val repository = application.repository
+                            if (repository != null) {
+                                val members = repository.getAllMembersOnce()
+                                for (member in members) {
+                                    member.profileImageUri?.let { File(it).delete() }
+                                    val prescriptions = repository.getPrescriptionsForMember(member.id).first()
+                                    prescriptions.forEach { p -> p.imageUri?.split(',')?.filter{it.isNotBlank()}?.forEach { path -> File(path).delete() } }
+                                    val reports = repository.getReportsForMember(member.id).first()
+                                    reports.forEach { r -> r.fileUri?.split(',')?.filter{it.isNotBlank()}?.forEach { path -> File(path).delete() } }
+                                }
+                                repository.clearAllDatabaseTables()
+                            }
+                            Firebase.auth.currentUser?.delete()?.addOnCompleteListener {
+                                authViewModel.logout()
+                                application.onUserLogout()
+                                prefs.clearAllData()
+                                navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                        }
+                    }
+                )
+            }
         }
 
         composable(AppDestinations.ABOUT_ROUTE) {
@@ -131,32 +213,6 @@ fun AppNavHost(
 
         composable(AppDestinations.HELP_ROUTE) {
             HelpScreen(onNavigateUp = { navController.navigateUp() })
-        }
-
-        composable(AppDestinations.SETTINGS_ROUTE) {
-            SettingsScreen(
-                onNavigateUp = { navController.navigateUp() },
-                onNavigateToChangePin = {
-                    navController.navigate(AppDestinations.PIN_SETUP_ROUTE)
-                },
-                onLogout = {
-                    authViewModel.logout()
-                    prefs.clear()
-                    navController.navigate(AppDestinations.LOGIN_ROUTE) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                },
-                onDeleteAccount = {
-                    // TODO: Add logic to delete all data from database and files
-                    Firebase.auth.currentUser?.delete()
-                    authViewModel.logout()
-                    prefs.clear()
-
-                    navController.navigate(AppDestinations.LOGIN_ROUTE) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                }
-            )
         }
 
         val memberDetailsRoute = "${AppDestinations.MEMBER_DETAILS_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}"
@@ -169,22 +225,16 @@ fun AppNavHost(
         ) { backStackEntry ->
             val memberId = backStackEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)
             val memberName = backStackEntry.arguments?.getString(AppDestinations.MEMBER_NAME_ARG)
-            val memberDetailsViewModel: MemberDetailsViewModel = viewModel(factory = MemberDetailsViewModel.Factory)
-
-            if (memberId != null && memberName != null) {
-                MemberDetailsScreen(
-                    memberId = memberId,
-                    memberName = memberName,
-                    memberDetailsViewModel = memberDetailsViewModel,
-                    onNavigateToViewDocument = { docId, docPath, docType, docTitle ->
-                        navController.navigate("${AppDestinations.VIEW_DOCUMENT_ROUTE}/$docId/${docPath.encodeUri()}/$docType/${docTitle.encodeUri()}")
-                    },
-                    onNavigateUp = { navController.navigateUp() }
-                )
-            } else {
-                navController.navigateUp()
-            }
+            MemberDetailsScreen(
+                memberId = memberId!!,
+                memberName = memberName!!,
+                onNavigateToViewDocument = { docId, docPath, docType, docTitle ->
+                    navController.navigate("${AppDestinations.VIEW_DOCUMENT_ROUTE}/$docId/${docPath.encodeUri()}/$docType/${docTitle.encodeUri()}")
+                },
+                onNavigateUp = { navController.navigateUp() }
+            )
         }
+
         composable(
             route = "${AppDestinations.VIEW_DOCUMENT_ROUTE}/{${AppDestinations.DOCUMENT_ID_ARG}}/{${AppDestinations.DOCUMENT_URI_ARG}}/{${AppDestinations.DOCUMENT_TYPE_ARG}}/{${AppDestinations.DOCUMENT_TITLE_ARG}}",
             arguments = listOf(

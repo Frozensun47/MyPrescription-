@@ -3,17 +3,13 @@ package com.example.myprescription.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,13 +17,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.myprescription.util.Prefs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    userId: String,
     onNavigateUp: () -> Unit,
     onNavigateToChangePin: () -> Unit,
     onLogout: () -> Unit,
@@ -35,8 +33,12 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val prefs = remember { Prefs(context) }
-    var isPinEnabled by remember { mutableStateOf(prefs.isPinEnabled) }
+
+    // State for dialogs
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showVerifyPinDialog by remember { mutableStateOf(false) }
+
+    var isPinEnabled by remember { mutableStateOf(prefs.isPinEnabled(userId)) }
 
     Scaffold(
         topBar = {
@@ -55,22 +57,32 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
-            // New "App" Section
             SettingsSectionTitle("App")
             SettingsItem(
                 title = "Enable Password",
-                subtitle = "Use a PIN to unlock the app",
+                subtitle = if (isPinEnabled) "PIN is enabled" else "PIN is disabled",
                 icon = Icons.Default.Lock,
                 onClick = {
-                    isPinEnabled = !isPinEnabled
-                    prefs.isPinEnabled = isPinEnabled
+                    val newState = !isPinEnabled
+                    // Disabling the PIN removes it.
+                    if (!newState) {
+                        prefs.setPinEnabled(userId, false)
+                        isPinEnabled = false
+                    } else {
+                        // To enable, user must set a new PIN.
+                        onNavigateToChangePin()
+                    }
                 },
                 trailingContent = {
                     Switch(
                         checked = isPinEnabled,
-                        onCheckedChange = {
-                            isPinEnabled = it
-                            prefs.isPinEnabled = it
+                        onCheckedChange = { newState ->
+                            if (!newState) {
+                                prefs.setPinEnabled(userId, false)
+                                isPinEnabled = false
+                            } else {
+                                onNavigateToChangePin()
+                            }
                         }
                     )
                 }
@@ -78,7 +90,14 @@ fun SettingsScreen(
             SettingsItem(
                 title = "Change Password",
                 icon = Icons.Default.Key,
-                onClick = onNavigateToChangePin
+                onClick = {
+                    // If a PIN exists, verify it first. Otherwise, go straight to setting one.
+                    if (prefs.isPinEnabled(userId)) {
+                        showVerifyPinDialog = true
+                    } else {
+                        onNavigateToChangePin()
+                    }
+                }
             )
 
             Divider(modifier = Modifier.padding(vertical = 8.dp))
@@ -90,9 +109,9 @@ fun SettingsScreen(
             Divider(modifier = Modifier.padding(vertical = 8.dp))
 
             SettingsSectionTitle("General")
-            SettingsItem(title = "About MyPrescription", icon = Icons.Default.Info, onClick = { /* TODO */ })
+            SettingsItem(title = "About MyPrescription", icon = Icons.Default.Info, onClick = { /* TODO: Navigate to About screen */ })
             SettingsItem(title = "Privacy Policy", icon = Icons.Default.PrivacyTip, onClick = { /* TODO */ })
-            SettingsItem(title = "Help and Support", icon = Icons.AutoMirrored.Filled.Help, onClick = { /* TODO */ })
+            SettingsItem(title = "Help and Support", icon = Icons.AutoMirrored.Filled.Help, onClick = { /* TODO: Navigate to Help screen */ })
 
             Divider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -102,7 +121,7 @@ fun SettingsScreen(
                 title = "Delete Account",
                 subtitle = "This action is permanent",
                 icon = Icons.Default.DeleteForever,
-                onClick = { showDeleteDialog = true } // Open the confirmation dialog
+                onClick = { showDeleteDialog = true }
             )
         }
     }
@@ -116,6 +135,28 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showVerifyPinDialog) {
+        VerifyPinDialog(
+            onDismiss = { showVerifyPinDialog = false },
+            onConfirm = {
+                showVerifyPinDialog = false
+                onNavigateToChangePin()
+            },
+            correctPin = prefs.getPin(userId) ?: ""
+        )
+    }
+}
+
+@Composable
+private fun SettingsSectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    )
 }
 
 @Composable
@@ -124,7 +165,7 @@ private fun SettingsItem(
     subtitle: String? = null,
     icon: ImageVector,
     onClick: () -> Unit,
-    trailingContent: @Composable (() -> Unit)? = null
+    trailingContent: (@Composable () -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -156,17 +197,6 @@ private fun SettingsItem(
             trailingContent()
         }
     }
-}
-
-@Composable
-private fun SettingsSectionTitle(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-    )
 }
 
 @Composable
@@ -208,6 +238,60 @@ fun DeleteAccountConfirmationDialog(
                 )
             ) {
                 Text("Confirm Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun VerifyPinDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    correctPin: String
+) {
+    var enteredPin by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Verify Your Identity") },
+        text = {
+            Column {
+                Text("Please enter your current PIN to continue.")
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = enteredPin,
+                    onValueChange = {
+                        if (it.length <= 4) enteredPin = it.filter { c -> c.isDigit() }
+                        error = null
+                    },
+                    label = { Text("Current PIN") },
+                    singleLine = true,
+                    isError = error != null,
+                    supportingText = { if(error != null) Text(error!!) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (enteredPin == correctPin) {
+                        onConfirm()
+                    } else {
+                        error = "Incorrect PIN"
+                    }
+                },
+                enabled = enteredPin.length == 4
+            ) {
+                Text("Confirm")
             }
         },
         dismissButton = {

@@ -6,7 +6,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
@@ -29,17 +34,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myprescription.R
+import com.example.myprescription.ViewModel.AuthViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 
-
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit) {
+fun LoginScreen(
+    authViewModel: AuthViewModel = viewModel(),
+    onLoginSuccess: () -> Unit
+) {
     val context = LocalContext.current
     var isLoading by remember { mutableStateOf(false) }
     val (termsAccepted, onTermsAcceptedChange) = remember { mutableStateOf(false) }
@@ -49,25 +57,18 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         isVisible = true
     }
 
-    // --- 1. SETUP FOR FLOATING ANIMATION ---
+    // --- Floating Animation Setup ---
     val infiniteTransition = rememberInfiniteTransition(label = "logo_float_transition")
     val logoOffsetY by infiniteTransition.animateFloat(
-        initialValue = -10f, // Start 10 pixels up
-        targetValue = 10f,   // End 10 pixels down
+        initialValue = -10f,
+        targetValue = 10f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse // This makes it go up and down smoothly
+            repeatMode = RepeatMode.Reverse
         ), label = "logo_offset_y"
     )
 
-    // --- Google Sign-In Logic (remains the same) ---
-    val gso = remember {
-        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(context.getString(R.string.default_web_client_id))
-            .requestEmail()
-            .build()
-    }
-    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
+    // --- Correct Google Sign-In Logic from AuthViewModel ---
     val signInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -90,11 +91,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         }
     }
     val launchSignIn: () -> Unit = {
-        val signInIntent = googleSignInClient.signInIntent
+        val signInIntent = authViewModel.getSignInIntent()
         signInLauncher.launch(signInIntent)
     }
 
-    // --- New, Updated UI ---
+    // --- Your Desired UI ---
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -115,9 +116,9 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // --- 2. APPLYING THE ANIMATION ---
+                    // Animated Logo
                     Image(
-                        painter = painterResource(id = R.mipmap.my_prescription_foreground), // Corrected resource
+                        painter = painterResource(id = R.mipmap.my_prescription_foreground),
                         contentDescription = "App Logo",
                         modifier = Modifier
                             .size(200.dp)
