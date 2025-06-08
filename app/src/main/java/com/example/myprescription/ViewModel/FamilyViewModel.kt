@@ -17,7 +17,11 @@ import java.io.File
 
 class FamilyViewModel(application: Application, private val repository: AppRepository) : AndroidViewModel(application) {
 
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
     val members: StateFlow<List<Member>> = repository.getAllMembers()
+        .onEach { _isLoading.value = false } // Set loading to false after the first data emission
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _showAddMemberDialog = MutableStateFlow(false)
@@ -36,14 +40,13 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
                 }
             }
             repository.insertMember(finalMember)
-            _showAddMemberDialog.value = false // Close dialog after adding
+            _showAddMemberDialog.value = false
         }
     }
 
     fun updateMember(memberData: Member, profilePhotoUri: Uri?) {
         viewModelScope.launch {
             var finalMember = memberData
-            // Only save if new URI
             if (profilePhotoUri != null && profilePhotoUri.toString() != memberData.profileImageUri) {
                 val imagePath = saveFileToInternalStorage(getApplication(), profilePhotoUri, "profile")
                 if (imagePath.isNotBlank()) {
@@ -54,7 +57,7 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
             }
             repository.updateMember(finalMember)
             _editingMember.value = null
-            _showAddMemberDialog.value = false // Close dialog after updating
+            _showAddMemberDialog.value = false
         }
     }
 
@@ -81,7 +84,6 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
         _showAddMemberDialog.value = false
         _editingMember.value = null
     }
-
 
     companion object {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {

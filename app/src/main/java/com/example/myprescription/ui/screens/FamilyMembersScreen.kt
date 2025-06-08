@@ -59,7 +59,7 @@ fun FamilyMembersScreen(
     onChangeAccountClick: () -> Unit
 ) {
     val members by familyViewModel.members.collectAsState()
-    val isLoading = members.isEmpty()
+    val isLoading by familyViewModel.isLoading.collectAsState() // Get the new loading state
 
     val showDialog by familyViewModel.showAddMemberDialog.collectAsState()
     val editingMember by familyViewModel.editingMember.collectAsState()
@@ -117,21 +117,28 @@ fun FamilyMembersScreen(
                 }
             }
         ) { paddingValues ->
-            Column(modifier = Modifier.padding(top = paddingValues.calculateTopPadding())) {
-                // A more robust loading check could be passed from the ViewModel
-                if (members.isEmpty() && isLoading) {
+            // FIX: Replaced flawed logic with a clear, 3-state check
+            when {
+                isLoading -> {
+                    // 1. Loading State
                     LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
+                        contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = 80.dp, start = 16.dp, end = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(5) { ShimmerEffect() }
                     }
-                } else if (members.isEmpty()) {
+                }
+                members.isEmpty() -> {
+                    // 2. Empty State
                     EmptyState()
-                } else {
+                }
+                else -> {
+                    // 3. Data Loaded State
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 80.dp, start = 16.dp, end = 16.dp, top = 16.dp),
+                        modifier = Modifier
+                            .padding(paddingValues)
+                            .fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 80.dp, start = 16.dp, end = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(members, key = { it.id }) { member ->
@@ -415,7 +422,7 @@ fun EmptyState() {
         verticalArrangement = Arrangement.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.app_logo_foreground),
+            painter = painterResource(id = R.mipmap.my_prescription_foreground),
             contentDescription = "Empty State Illustration",
             modifier = Modifier.size(150.dp),
             colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)

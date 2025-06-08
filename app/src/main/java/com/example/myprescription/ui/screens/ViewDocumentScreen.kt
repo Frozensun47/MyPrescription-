@@ -154,6 +154,8 @@ fun ViewDocumentScreen(
                 },
                 actions = {
                     if (isInSelectionMode) {
+                        // In a real app, you'd add share/download functionality here.
+                        // For now, they are placeholders.
                         IconButton(onClick = { /* Share Logic */ }) { Icon(Icons.Default.Share, "Share") }
                         IconButton(onClick = { /* Download Logic */ }) { Icon(Icons.Default.Download, "Download") }
                         IconButton(onClick = { showDeleteConfirmation = true }) { Icon(Icons.Default.Delete, "Delete") }
@@ -162,75 +164,84 @@ fun ViewDocumentScreen(
             )
         }
     ) { paddingValues ->
-        Box(
+        Column(
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
-            Column(Modifier.fillMaxSize()) {
-                if (filePaths.isEmpty()) {
-                    val emptyMessage = if (documentType == "prescription") "No images have been added yet. Tap the '+' button to add one." else "No files have been added yet."
-                    EmptyStateView(emptyMessage, modifier = Modifier.weight(1f))
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 120.dp),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        itemsIndexed(filePaths, key = { _, path -> path }) { index, path ->
-                            DocumentGridItem(
-                                filePath = path,
-                                documentType = documentType,
-                                displayName = if (documentType == "prescription") "Image ${index + 1}" else "File ${index + 1}",
-                                isSelected = path in selectedFilePaths,
-                                onClick = {
-                                    if (isInSelectionMode) {
-                                        selectedFilePaths = if (path in selectedFilePaths) selectedFilePaths - path else selectedFilePaths + path
-                                    } else {
-                                        if (documentType == "prescription") {
-                                            imageViewerState = ImageViewerState(filePaths, index)
-                                        } else {
-                                            openFile(context, path)
-                                        }
-                                    }
-                                },
-                                onLongClick = {
-                                    selectedFilePaths += path
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Column(
+            // Document Grid (takes up remaining space)
+            if (filePaths.isEmpty()) {
+                val emptyMessage = if (documentType == "prescription") "No images have been added yet. Tap the '+' button to add one." else "No files have been added yet."
+                EmptyStateView(emptyMessage, modifier = Modifier.weight(1f))
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 120.dp),
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp))
-                        .padding(16.dp)
+                        .weight(1f) // This is the key change! It makes the grid fill the available space.
+                        .padding(horizontal = 16.dp), // Apply horizontal padding to the grid itself
+                    contentPadding = PaddingValues(vertical = 16.dp), // Apply vertical padding within the grid content
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Notes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = notesText,
-                        onValueChange = { notesText = it },
-                        label = { Text("Add or edit notes here...") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(130.dp)
-                            .verticalScroll(rememberScrollState()),
-                        shape = MaterialTheme.shapes.medium
-                    )
+                    itemsIndexed(filePaths, key = { _, path -> path }) { index, path ->
+                        DocumentGridItem(
+                            filePath = path,
+                            documentType = documentType,
+                            displayName = if (documentType == "prescription") "Image ${index + 1}" else "File ${index + 1}",
+                            isSelected = path in selectedFilePaths,
+                            onClick = {
+                                if (isInSelectionMode) {
+                                    selectedFilePaths = if (path in selectedFilePaths) selectedFilePaths - path else selectedFilePaths + path
+                                } else {
+                                    if (documentType == "prescription") {
+                                        imageViewerState = ImageViewerState(filePaths, index)
+                                    } else {
+                                        openFile(context, path)
+                                    }
+                                }
+                            },
+                            onLongClick = {
+                                selectedFilePaths += path
+                            }
+                        )
+                    }
                 }
             }
 
-            if (documentType == "prescription" && !isInSelectionMode) {
+            // Notes Section
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp))
+                    .padding(16.dp)
+            ) {
+                Text("Notes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = notesText,
+                    onValueChange = { notesText = it },
+                    label = { Text("Add or edit notes here...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 100.dp, max = 200.dp) // Use heightIn for flexibility
+                        .verticalScroll(rememberScrollState()),
+                    shape = MaterialTheme.shapes.medium
+                )
+            }
+        }
+
+        // Floating Action Button (placed in a Box to layer it over content)
+        if (documentType == "prescription" && !isInSelectionMode) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues) // Respect the padding from the Scaffold
+            ) {
                 FloatingActionButton(
                     onClick = { importImageLauncher.launch("image/*") },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 180.dp)
+                        .padding(end = 16.dp, bottom = 16.dp) // Adjust FAB padding
                 ) {
                     Icon(Icons.Filled.AddPhotoAlternate, "Import Image")
                 }
@@ -387,6 +398,7 @@ private fun ImagePager(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
+                // Use systemBarsPadding() to push content away from system bars
                 .systemBarsPadding()
         ) {
             Row(

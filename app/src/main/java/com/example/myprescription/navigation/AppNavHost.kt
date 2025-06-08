@@ -1,5 +1,6 @@
 package com.example.myprescription.navigation
 
+import android.util.Log // Import Log for logging
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -140,7 +141,56 @@ fun AppNavHost(
         }
 
         composable(AppDestinations.SETTINGS_ROUTE) {
-            // ... (Settings composable remains the same)
+            val authViewModel: AuthViewModel = viewModel()
+            val firebaseUser by authViewModel.user.collectAsState()
+            val currentUserId = firebaseUser?.uid
+
+            val applicationScope = rememberCoroutineScope()
+
+            if (currentUserId != null) {
+                SettingsScreen(
+                    userId = currentUserId,
+                    onNavigateUp = { navController.navigateUp() },
+                    onNavigateToChangePin = {
+                        navController.navigate(AppDestinations.PIN_SETUP_ROUTE)
+                    },
+                    onLogout = {
+                        authViewModel.logout()
+                        application.onUserLogout()
+                        navController.navigate(AppDestinations.LOGIN_ROUTE) { popUpTo(navController.graph.startDestinationId) { inclusive = true } }
+                    },
+                    onDeleteAccount = {
+                        applicationScope.launch {
+                            val userToDelete = Firebase.auth.currentUser
+                            if (userToDelete != null && userToDelete.uid == currentUserId) {
+                                // Clear local data associated with the user
+                                // A more robust solution would iterate through all member, prescription, and report files
+                                // and delete them from internal storage before clearing the database.
+                                application.repository?.clearAllDatabaseTables()
+                                prefs.clearAllData() // Clear all user-related preferences, including PIN
+
+                                userToDelete.delete()
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) {
+                                            Log.d("SettingsScreen", "Firebase user account deleted.")
+                                            authViewModel.logout()
+                                            application.onUserLogout()
+                                            navController.navigate(AppDestinations.LOGIN_ROUTE) { popUpTo(navController.graph.startDestinationId) { inclusive = true } }
+                                        } else {
+                                            Log.e("SettingsScreen", "Failed to delete Firebase account: ${task.exception?.message}")
+                                            // Handle case where re-authentication might be needed or show an error
+                                        }
+                                    }
+                            }
+                        }
+                    }
+                )
+            } else {
+                // If currentUserId is null, navigate back to login to ensure user is authenticated
+                LaunchedEffect(Unit) {
+                    navController.navigate(AppDestinations.LOGIN_ROUTE) { popUpTo(navController.graph.startDestinationId) { inclusive = true } }
+                }
+            }
         }
 
         composable(AppDestinations.ABOUT_ROUTE) { AboutScreen(onNavigateUp = { navController.navigateUp() }) }

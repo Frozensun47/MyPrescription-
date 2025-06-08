@@ -50,7 +50,7 @@ fun SettingsScreen(
         }
     ) { paddingValues ->
         // FIX: Wrapped content in a Surface to ensure it has a background
-        Surface(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+        Surface(modifier = Modifier.padding(paddingValues).fillMaxSize()) { //
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
