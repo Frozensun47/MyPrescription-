@@ -28,6 +28,8 @@ object AppDestinations {
     const val SETTINGS_ROUTE = "settings"
     const val MEMBER_DETAILS_ROUTE = "member_details"
     const val VIEW_DOCUMENT_ROUTE = "view_document"
+    const val ABOUT_ROUTE = "about"
+    const val HELP_ROUTE = "help"
 
     const val MEMBER_ID_ARG = "memberId"
     const val MEMBER_NAME_ARG = "memberName"
@@ -110,8 +112,25 @@ fun AppNavHost(
                 onNavigateToMemberDetails = { memberId, memberName ->
                     navController.navigate("${AppDestinations.MEMBER_DETAILS_ROUTE}/$memberId/$memberName")
                 },
-                onNavigateToSettings = { navController.navigate(AppDestinations.SETTINGS_ROUTE) }
+                onNavigateToSettings = { navController.navigate(AppDestinations.SETTINGS_ROUTE) },
+                onNavigateToHelp = { navController.navigate(AppDestinations.HELP_ROUTE) },
+                onNavigateToAbout = { navController.navigate(AppDestinations.ABOUT_ROUTE) },
+                onChangeAccountClick = {
+                    authViewModel.logout()
+                    prefs.clear()
+                    navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
             )
+        }
+
+        composable(AppDestinations.ABOUT_ROUTE) {
+            AboutScreen(onNavigateUp = { navController.navigateUp() })
+        }
+
+        composable(AppDestinations.HELP_ROUTE) {
+            HelpScreen(onNavigateUp = { navController.navigateUp() })
         }
 
         composable(AppDestinations.SETTINGS_ROUTE) {

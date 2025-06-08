@@ -5,14 +5,30 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.myprescription.R
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -20,29 +36,38 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
-import kotlinx.coroutines.launch
+
 
 @Composable
 fun LoginScreen(onLoginSuccess: () -> Unit) {
     val context = LocalContext.current
     var isLoading by remember { mutableStateOf(false) }
+    val (termsAccepted, onTermsAcceptedChange) = remember { mutableStateOf(false) }
+    var isVisible by remember { mutableStateOf(false) }
 
-    // 1. Configure Google Sign-In Options
-    // This object specifies the details we need from the user's Google account.
-    // We request an ID token for Firebase and the user's email.
+    LaunchedEffect(Unit) {
+        isVisible = true
+    }
+
+    // --- 1. SETUP FOR FLOATING ANIMATION ---
+    val infiniteTransition = rememberInfiniteTransition(label = "logo_float_transition")
+    val logoOffsetY by infiniteTransition.animateFloat(
+        initialValue = -10f, // Start 10 pixels up
+        targetValue = 10f,   // End 10 pixels down
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse // This makes it go up and down smoothly
+        ), label = "logo_offset_y"
+    )
+
+    // --- Google Sign-In Logic (remains the same) ---
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(context.getString(R.string.default_web_client_id)) // Your web client ID
+            .requestIdToken(context.getString(R.string.default_web_client_id))
             .requestEmail()
             .build()
     }
-
-    // 2. Create a GoogleSignInClient
-    // This client is responsible for managing the Google Sign-In process.
     val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
-
-    // 3. Create an ActivityResultLauncher
-    // This launcher will handle the result from the Google Sign-In activity.
     val signInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -50,9 +75,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         if (result.resultCode == Activity.RESULT_OK) {
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             try {
-                // Google Sign-In was successful, so we get the account
                 val account = task.getResult(ApiException::class.java)!!
-                // Now, we use the account's ID token to authenticate with Firebase
                 firebaseAuthWithGoogle(account.idToken!!) {
                     onLoginSuccess()
                 }
@@ -63,68 +86,159 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             }
         } else {
             isLoading = false
-            // Handle cases where the user cancels the sign-in flow
             Toast.makeText(context, "Google sign-in cancelled.", Toast.LENGTH_SHORT).show()
         }
     }
-
-    // 4. Define the Sign-In Function
-    // This function will be called when the user clicks the sign-in button.
     val launchSignIn: () -> Unit = {
         val signInIntent = googleSignInClient.signInIntent
         signInLauncher.launch(signInIntent)
     }
 
-    // --- The UI ---
-    // This is the user interface for your login screen. It remains largely unchanged.
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+    // --- New, Updated UI ---
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
     ) {
-        if (isLoading) {
-            CircularProgressIndicator()
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Signing in...")
-        } else {
-            Text(
-                "Welcome to MyPrescription",
-                style = MaterialTheme.typography.headlineLarge,
-                textAlign = TextAlign.Center
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            AnimatedVisibility(
+                visible = isVisible,
+                enter = fadeIn(animationSpec = tween(1000)) +
+                        slideInVertically(initialOffsetY = { -it / 2 }, animationSpec = tween(1000))
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // --- 2. APPLYING THE ANIMATION ---
+                    Image(
+                        painter = painterResource(id = R.mipmap.my_prescription_foreground), // Corrected resource
+                        contentDescription = "App Logo",
+                        modifier = Modifier
+                            .size(200.dp)
+                            .offset(y = logoOffsetY.dp),
+                        contentScale = ContentScale.Fit,
+                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+                    )
+
+                    Text(
+                        text = "Welcome to MyPrescription",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Text(
+                        "Sign in to securely store and manage your medical records.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            TermsAndConditionsCheckbox(
+                checked = termsAccepted,
+                onCheckedChange = onTermsAcceptedChange
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Sign in to securely store and manage your medical records.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(32.dp))
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             Button(
                 onClick = launchSignIn,
-                modifier = Modifier.fillMaxWidth()
+                enabled = termsAccepted,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp),
+                shape = RoundedCornerShape(12.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
-                Text("Sign In with Google", modifier = Modifier.padding(6.dp))
+                Text(
+                    text = "Sign In with Google",
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+        }
+
+        if (isLoading) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background.copy(alpha = 0.6f)
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ){
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Signing in, please wait...")
+                }
             }
         }
     }
 }
 
-/**
- * Authenticates the user with Firebase using the Google ID token.
- *
- * @param idToken The Google ID token obtained from a successful Google Sign-In.
- * @param onLoginSuccess A callback to execute upon successful Firebase authentication.
- */
+
+@Composable
+private fun TermsAndConditionsCheckbox(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    val uriHandler = LocalUriHandler.current
+    val annotatedString = buildAnnotatedString {
+        append("I agree to the ")
+        pushStringAnnotation(tag = "TERMS", annotation = "https://example.com/terms")
+        withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
+            append("Terms and Conditions")
+        }
+        pop()
+        append(" and ")
+        pushStringAnnotation(tag = "PRIVACY", annotation = "https://example.com/privacy")
+        withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
+            append("Privacy Policy")
+        }
+        pop()
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(horizontal = 32.dp)
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        ClickableText(
+            text = annotatedString,
+            style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+            onClick = { offset ->
+                annotatedString.getStringAnnotations(tag = "TERMS", start = offset, end = offset)
+                    .firstOrNull()?.let { uriHandler.openUri(it.item) }
+                annotatedString.getStringAnnotations(tag = "PRIVACY", start = offset, end = offset)
+                    .firstOrNull()?.let { uriHandler.openUri(it.item) }
+            }
+        )
+    }
+}
+
 private fun firebaseAuthWithGoogle(idToken: String, onLoginSuccess: () -> Unit) {
     val credential = GoogleAuthProvider.getCredential(idToken, null)
     Firebase.auth.signInWithCredential(credential)
         .addOnCompleteListener { task ->
             if (task.isSuccessful) {
-                // Firebase sign-in was successful.
                 onLoginSuccess()
             } else {
-                // If sign-in fails, log the error.
                 Log.w("LoginScreen", "signInWithCredential;failure", task.exception)
             }
         }

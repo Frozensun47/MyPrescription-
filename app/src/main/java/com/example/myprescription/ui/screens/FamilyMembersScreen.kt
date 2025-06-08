@@ -1,6 +1,7 @@
 package com.example.myprescription.ui.screens
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -33,135 +34,159 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.myprescription.R
+import com.example.myprescription.ViewModel.AuthViewModel
 import com.example.myprescription.model.Member
 import com.example.myprescription.ViewModel.FamilyViewModel
+import com.example.myprescription.ui.components.AppMenuTray
+import kotlinx.coroutines.launch
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FamilyMembersScreen(
     familyViewModel: FamilyViewModel = viewModel(factory = FamilyViewModel.Factory),
+    authViewModel: AuthViewModel = viewModel(),
     onNavigateToMemberDetails: (memberId: String, memberName: String) -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToHelp: () -> Unit,
+    onNavigateToAbout: () -> Unit,
+    onChangeAccountClick: () -> Unit
 ) {
     val members by familyViewModel.members.collectAsState()
     val showDialog by familyViewModel.showAddMemberDialog.collectAsState()
     val editingMember by familyViewModel.editingMember.collectAsState()
     var memberToDelete by remember { mutableStateOf<Member?>(null) }
-    var showMenu by remember { mutableStateOf(false) }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val user by authViewModel.user.collectAsState()
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Family Members", fontWeight = FontWeight.SemiBold) },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                actions = {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, "More Options")
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Settings") },
-                            onClick = {
-                                onNavigateToSettings()
-                                showMenu = false
-                            },
-                            leadingIcon = { Icon(Icons.Default.Settings, "Settings") }
-                        )
-                    }
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppMenuTray(
+                user = user,
+                onChangeAccountClick = {
+                    scope.launch { drawerState.close() }
+                    onChangeAccountClick()
+                },
+                onSettingsClick = {
+                    scope.launch { drawerState.close() }
+                    onNavigateToSettings()
+                },
+                onHelpClick = {
+                    scope.launch { drawerState.close() }
+                    onNavigateToHelp()
+                },
+                onAboutClick = {
+                    scope.launch { drawerState.close() }
+                    onNavigateToAbout()
                 }
             )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { familyViewModel.onAddMemberClicked() },
-                icon = { Icon(Icons.Filled.Add, contentDescription = "Add Member") },
-                text = { Text("Add Member") }
-            )
-        },
-        floatingActionButtonPosition = FabPosition.Center
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .padding(horizontal = 8.dp)
-        ) {
-            if (members.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "No family members added yet.\nClick 'Add Member' to get started.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 16.dp, horizontal = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(members, key = { it.id }) { member ->
-                        MemberCard(
-                            member = member,
-                            onCardClick = { onNavigateToMemberDetails(member.id, member.name) },
-                            onEditClick = { familyViewModel.onEditMemberClicked(member) },
-                            onDeleteClick = { memberToDelete = member }
-                        )
-                    }
-                }
-            }
-
-            if (showDialog) {
-                AddEditMemberDialog(
-                    memberToEdit = editingMember,
-                    onDismiss = { familyViewModel.onDismissDialog() },
-                    onConfirm = { memberData, profilePhotoUri ->
-                        if (editingMember == null) {
-                            familyViewModel.addMember(memberData, profilePhotoUri)
-                        } else {
-                            familyViewModel.updateMember(memberData, profilePhotoUri)
-                        }
-                    }
-                )
-            }
-
-            if (memberToDelete != null) {
-                AlertDialog(
-                    onDismissRequest = { memberToDelete = null },
-                    title = { Text("Delete ${memberToDelete!!.name}?") },
-                    text = { Text("Are you sure? All of this member's prescriptions and reports will be permanently deleted.") },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                familyViewModel.deleteMember(memberToDelete!!)
-                                memberToDelete = null
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                        ) {
-                            Text("Delete")
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("Family Members", fontWeight = FontWeight.SemiBold) },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            scope.launch { drawerState.open() }
+                        }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu")
                         }
                     },
-                    dismissButton = {
-                        TextButton(onClick = { memberToDelete = null }) {
-                            Text("Cancel")
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            },
+            floatingActionButton = {
+                ExtendedFloatingActionButton(
+                    onClick = { familyViewModel.onAddMemberClicked() },
+                    icon = { Icon(Icons.Filled.Add, contentDescription = "Add Member") },
+                    text = { Text("Add Member") }
+                )
+            },
+            floatingActionButtonPosition = FabPosition.Center
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp)
+            ) {
+                if (members.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No family members added yet.\nClick 'Add Member' to get started.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 16.dp, horizontal = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(members, key = { it.id }) { member ->
+                            MemberCard(
+                                member = member,
+                                onCardClick = { onNavigateToMemberDetails(member.id, member.name) },
+                                onEditClick = { familyViewModel.onEditMemberClicked(member) },
+                                onDeleteClick = { memberToDelete = member }
+                            )
                         }
                     }
-                )
+                }
+
+                if (showDialog) {
+                    AddEditMemberDialog(
+                        memberToEdit = editingMember,
+                        onDismiss = { familyViewModel.onDismissDialog() },
+                        onConfirm = { memberData, profilePhotoUri ->
+                            if (editingMember == null) {
+                                familyViewModel.addMember(memberData, profilePhotoUri)
+                            } else {
+                                familyViewModel.updateMember(memberData, profilePhotoUri)
+                            }
+                        }
+                    )
+                }
+
+                if (memberToDelete != null) {
+                    AlertDialog(
+                        onDismissRequest = { memberToDelete = null },
+                        title = { Text("Delete ${memberToDelete!!.name}?") },
+                        text = { Text("Are you sure? All of this member's prescriptions and reports will be permanently deleted.") },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    familyViewModel.deleteMember(memberToDelete!!)
+                                    memberToDelete = null
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("Delete")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { memberToDelete = null }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
             }
         }
     }
 }
+
 
 @Composable
 fun MemberCard(
@@ -352,7 +377,7 @@ fun AddEditMemberDialog(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.Start
                 ) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                 }
