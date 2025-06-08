@@ -215,7 +215,7 @@ fun AppNavHost(
                     memberName = memberName,
                     memberDetailsViewModel = memberDetailsViewModel,
                     onNavigateToViewDocument = { docId, docPath, docType, docTitle ->
-                        navController.navigate("${AppDestinations.VIEW_DOCUMENT_ROUTE}/$docId/${docPath.encodeUri()}/$docType/${docTitle.encodeUri()}")
+                        navController.navigate("${AppDestinations.VIEW_DOCUMENT_ROUTE}/$memberId/$docId/${docPath.encodeUri()}/$docType/${docTitle.encodeUri()}")
                     },
                     onNavigateUp = { navController.navigateUp() }
                 )
@@ -225,23 +225,25 @@ fun AppNavHost(
         }
 
         composable(
-            route = "${AppDestinations.VIEW_DOCUMENT_ROUTE}/{${AppDestinations.DOCUMENT_ID_ARG}}/{${AppDestinations.DOCUMENT_URI_ARG}}/{${AppDestinations.DOCUMENT_TYPE_ARG}}/{${AppDestinations.DOCUMENT_TITLE_ARG}}",
+            route = "${AppDestinations.VIEW_DOCUMENT_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.DOCUMENT_ID_ARG}}/{${AppDestinations.DOCUMENT_URI_ARG}}/{${AppDestinations.DOCUMENT_TYPE_ARG}}/{${AppDestinations.DOCUMENT_TITLE_ARG}}",
             arguments = listOf(
+                navArgument(AppDestinations.MEMBER_ID_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_ID_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_URI_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_TYPE_ARG) { type = NavType.StringType },
                 navArgument(AppDestinations.DOCUMENT_TITLE_ARG) { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            // Re-instantiate the ViewModel with the same factory to get the scoped instance
             val memberDetailsViewModel: MemberDetailsViewModel = viewModel(factory = MemberDetailsViewModel.Factory)
+            val memberId = backStackEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)
             val documentId = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_ID_ARG)
             val documentPath = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_URI_ARG)?.decodeUri()
             val documentType = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_TYPE_ARG)
             val documentTitle = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_TITLE_ARG)?.decodeUri()
 
-            if (documentId != null && documentPath != null && documentType != null && documentTitle != null) {
+            if (memberId != null && documentId != null && documentPath != null && documentType != null && documentTitle != null) {
                 ViewDocumentScreen(
+                    memberId = memberId,
                     documentId = documentId,
                     documentUriString = documentPath,
                     documentType = documentType,

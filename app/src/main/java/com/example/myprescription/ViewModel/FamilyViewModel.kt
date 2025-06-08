@@ -10,15 +10,12 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.myprescription.MyPrescriptionApplication
 import com.example.myprescription.data.repository.AppRepository
 import com.example.myprescription.model.Member
+import com.example.myprescription.util.saveFileToInternalStorage
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.FileOutputStream
-import java.io.InputStream
 
 class FamilyViewModel(application: Application, private val repository: AppRepository) : AndroidViewModel(application) {
-
-    // ... (rest of the ViewModel is unchanged) ...
 
     val members: StateFlow<List<Member>> = repository.getAllMembers()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -29,28 +26,12 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
     private val _editingMember = MutableStateFlow<Member?>(null)
     val editingMember: StateFlow<Member?> = _editingMember.asStateFlow()
 
-    private suspend fun saveImageToInternalStorage(context: android.content.Context, uri: Uri, memberId: String): String? {
-        return try {
-            val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-            val fileName = "profile_${memberId}_${System.currentTimeMillis()}.jpg"
-            val file = File(context.filesDir, fileName)
-            val outputStream = FileOutputStream(file)
-            inputStream?.copyTo(outputStream)
-            inputStream?.close()
-            outputStream.close()
-            file.absolutePath
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
-
     fun addMember(memberData: Member, profilePhotoUri: Uri?) {
         viewModelScope.launch {
             var finalMember = memberData
             if (profilePhotoUri != null) {
-                val imagePath = saveImageToInternalStorage(getApplication(), profilePhotoUri, memberData.id)
-                if (imagePath != null) {
+                val imagePath = saveFileToInternalStorage(getApplication(), profilePhotoUri, "profile")
+                if (imagePath.isNotBlank()) {
                     finalMember = memberData.copy(profileImageUri = imagePath)
                 }
             }
@@ -62,9 +43,10 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
     fun updateMember(memberData: Member, profilePhotoUri: Uri?) {
         viewModelScope.launch {
             var finalMember = memberData
-            if (profilePhotoUri != null && profilePhotoUri.toString() != memberData.profileImageUri /* Only save if new URI */) {
-                val imagePath = saveImageToInternalStorage(getApplication(), profilePhotoUri, memberData.id)
-                if (imagePath != null) {
+            // Only save if new URI
+            if (profilePhotoUri != null && profilePhotoUri.toString() != memberData.profileImageUri) {
+                val imagePath = saveFileToInternalStorage(getApplication(), profilePhotoUri, "profile")
+                if (imagePath.isNotBlank()) {
                     finalMember = memberData.copy(profileImageUri = imagePath)
                 }
             } else if (profilePhotoUri == null && memberData.profileImageUri != null) {
@@ -109,7 +91,6 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
                 extras: CreationExtras
             ): T {
                 val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) as MyPrescriptionApplication
-                // The repository is now retrieved from the application instance, which holds the user-specific version.
                 val repository = application.repository ?: throw IllegalStateException("Repository not initialized, user must be logged in.")
                 return FamilyViewModel(
                     application,

@@ -2,7 +2,6 @@ package com.example.myprescription.ViewModel
 
 import android.app.Application
 import android.net.Uri
-import android.webkit.MimeTypeMap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -12,16 +11,13 @@ import com.example.myprescription.MyPrescriptionApplication
 import com.example.myprescription.data.repository.AppRepository
 import com.example.myprescription.model.Prescription
 import com.example.myprescription.model.Report
+import com.example.myprescription.util.saveFileToInternalStorage
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.FileOutputStream
-import java.io.InputStream
-import java.util.Date
 
 class MemberDetailsViewModel(application: Application, private val repository: AppRepository) : AndroidViewModel(application) {
 
-    // ... (rest of the ViewModel is unchanged) ...
     private val _currentMemberId = MutableStateFlow<String?>(null)
 
     val prescriptions: StateFlow<List<Prescription>> = _currentMemberId.flatMapLatest { memberId ->
@@ -57,24 +53,6 @@ class MemberDetailsViewModel(application: Application, private val repository: A
 
     fun loadMemberData(memberId: String) {
         _currentMemberId.value = memberId
-    }
-
-    private suspend fun saveFileToInternalStorage(context: android.content.Context, uri: Uri, type: String, itemId: String): String? {
-        return try {
-            val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-            val mimeType = context.contentResolver.getType(uri)
-            val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
-            val fileName = "${type}_${itemId}_${System.currentTimeMillis()}" + if (extension != null) ".$extension" else ""
-            val file = File(context.filesDir, fileName)
-            val outputStream = FileOutputStream(file)
-            inputStream?.copyTo(outputStream)
-            inputStream?.close()
-            outputStream.close()
-            file.absolutePath
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
     }
 
     fun addPrescription(prescriptionData: Prescription) {
@@ -169,8 +147,8 @@ class MemberDetailsViewModel(application: Application, private val repository: A
             val newPaths = existingPaths.toMutableList()
 
             for (uri in pickedImageUris) {
-                val imagePath = saveFileToInternalStorage(getApplication(), uri, "prescription", targetId)
-                imagePath?.let { newPaths.add(it) }
+                val imagePath = saveFileToInternalStorage(getApplication(), uri, "prescription")
+                if(imagePath.isNotBlank()) newPaths.add(imagePath)
             }
 
             val updatedPrescription = currentPrescription.copy(imageUri = newPaths.joinToString(","))
@@ -188,8 +166,8 @@ class MemberDetailsViewModel(application: Application, private val repository: A
             val newPaths = existingPaths.toMutableList()
 
             for (uri in pickedFileUris) {
-                val filePath = saveFileToInternalStorage(getApplication(), uri, "report", targetId)
-                filePath?.let { newPaths.add(it) }
+                val filePath = saveFileToInternalStorage(getApplication(), uri, "report")
+                if(filePath.isNotBlank()) newPaths.add(filePath)
             }
 
             val updatedReport = currentReport.copy(fileUri = newPaths.joinToString(","))
@@ -212,6 +190,13 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         }
     }
 
+    fun updatePrescriptionImageUris(prescriptionId: String, newUris: String) {
+        viewModelScope.launch {
+            val prescription = prescriptions.value.find { it.id == prescriptionId } ?: return@launch
+            repository.updatePrescription(prescription.copy(imageUri = newUris))
+        }
+    }
+
     fun onAddPrescriptionClicked() { _showAddPrescriptionDialog.value = true }
     fun onAddReportClicked() { _showAddReportDialog.value = true }
     fun onEditPrescriptionClicked(prescription: Prescription) { _editingPrescription.value = prescription }
@@ -228,8 +213,7 @@ class MemberDetailsViewModel(application: Application, private val repository: A
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) as MyPrescriptionApplication
-                // The repository is now retrieved from the application instance.
-                val repository = application.repository ?: throw IllegalStateException("Repository not initialized, user must be logged in.")
+                val repository = application.repository ?: throw IllegalStateException("Repository not initialized")
                 return MemberDetailsViewModel(application, repository) as T
             }
         }
