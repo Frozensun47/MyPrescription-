@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)    // Your existing plugin
     alias(libs.plugins.kotlin.compose)    // Your existing plugin
     id("com.google.devtools.ksp") version "2.0.0-1.0.21" // KSP for Room
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -64,17 +65,26 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.core:core-splashscreen:1.0.1")
-    // For Icons
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
+
+    implementation(platform("com.google.firebase:firebase-bom:33.15.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    // ADD the new Credential Manager libraries
+    implementation("androidx.credentials:credentials:1.2.2")
+    implementation("androidx.credentials:credentials-play-services-auth:1.2.2")
 
     // Coroutines for background tasks
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.0")
-
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation(libs.googleid)
 
     // Room Persistence Library
     val roomVersion = "2.6.1" // Ensure this is the latest stable version

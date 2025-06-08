@@ -41,12 +41,14 @@ import java.io.File
 @Composable
 fun FamilyMembersScreen(
     familyViewModel: FamilyViewModel = viewModel(factory = FamilyViewModel.Factory),
-    onNavigateToMemberDetails: (memberId: String, memberName: String) -> Unit
+    onNavigateToMemberDetails: (memberId: String, memberName: String) -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val members by familyViewModel.members.collectAsState()
     val showDialog by familyViewModel.showAddMemberDialog.collectAsState()
     val editingMember by familyViewModel.editingMember.collectAsState()
     var memberToDelete by remember { mutableStateOf<Member?>(null) }
+    var showMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -55,7 +57,25 @@ fun FamilyMembersScreen(
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                ),
+                actions = {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, "More Options")
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Settings") },
+                            onClick = {
+                                onNavigateToSettings()
+                                showMenu = false
+                            },
+                            leadingIcon = { Icon(Icons.Default.Settings, "Settings") }
+                        )
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -88,7 +108,7 @@ fun FamilyMembersScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 16.dp),
+                    contentPadding = PaddingValues(vertical = 16.dp, horizontal = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(members, key = { it.id }) { member ->
@@ -96,7 +116,7 @@ fun FamilyMembersScreen(
                             member = member,
                             onCardClick = { onNavigateToMemberDetails(member.id, member.name) },
                             onEditClick = { familyViewModel.onEditMemberClicked(member) },
-                            onDeleteClick = { memberToDelete = member } // Set member to delete
+                            onDeleteClick = { memberToDelete = member }
                         )
                     }
                 }
@@ -116,7 +136,6 @@ fun FamilyMembersScreen(
                 )
             }
 
-            // Confirmation Dialog for deleting a member
             if (memberToDelete != null) {
                 AlertDialog(
                     onDismissRequest = { memberToDelete = null },

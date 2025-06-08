@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">MyPrescription</string>
+    <string name="default_web_client_id" translatable="false">1:1032596195448:android:4ab52294aec6515095058d</string>
+
 </resources>
