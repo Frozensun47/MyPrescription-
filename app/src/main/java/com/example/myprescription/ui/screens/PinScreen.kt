@@ -23,13 +23,24 @@ fun PinScreen(
     var pin by remember { mutableStateOf("") }
     var shake by remember { mutableStateOf(false) }
 
-    // When an error occurs, trigger the shake animation
+    // When an error occurs, trigger the shake animation and clear the pin
     LaunchedEffect(error) {
         if (error != null) {
             pin = "" // Clear PIN on error
             shake = true
             delay(500) // Duration of shake
             shake = false
+        }
+    }
+
+    // When the pin reaches full length, trigger the appropriate action
+    LaunchedEffect(pin) {
+        if (pin.length == 4) {
+            if (mode == PinScreenMode.SET) {
+                onPinSet(pin)
+            } else {
+                onPinEntered(pin)
+            }
         }
     }
 
@@ -56,7 +67,7 @@ fun PinScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Your information is protected.",
+                text = if (mode == PinScreenMode.SET) "Create a 4-digit PIN for quick access." else "Enter your 4-digit PIN to unlock.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -65,7 +76,7 @@ fun PinScreen(
             // Use the new, stable PinInput component
             PinInput(
                 pin = pin,
-                onPinChange = { pin = it },
+                onPinChange = { newPin -> pin = newPin },
                 isError = error != null,
                 modifier = Modifier.scale(scale)
             )
