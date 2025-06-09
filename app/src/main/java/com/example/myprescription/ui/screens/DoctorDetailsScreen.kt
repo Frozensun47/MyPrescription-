@@ -29,8 +29,14 @@ fun DoctorDetailsScreen(
     onNavigateToViewDocument: (documentId: String, documentType: String, documentTitle: String) -> Unit,
     onNavigateUp: () -> Unit
 ) {
+    // --- STATE COLLECTION ---
     val prescriptions by memberDetailsViewModel.prescriptionsForSelectedDoctor.collectAsState()
     val reports by memberDetailsViewModel.reportsForSelectedDoctor.collectAsState()
+    val showAddPrescriptionDialog by memberDetailsViewModel.showAddPrescriptionDialog.collectAsState()
+    val showAddReportDialog by memberDetailsViewModel.showAddReportDialog.collectAsState()
+    val editingPrescription by memberDetailsViewModel.editingPrescription.collectAsState()
+    val editingReport by memberDetailsViewModel.editingReport.collectAsState()
+    val currentMemberId by memberDetailsViewModel.currentMemberId.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
     // Load data for the specific doctor when the screen is shown
@@ -65,10 +71,8 @@ fun DoctorDetailsScreen(
             FloatingActionButton(
                 onClick = {
                     if (pagerState.currentPage == 0) {
-                        // Open dialog to add prescription for this doctor
                         memberDetailsViewModel.onAddPrescriptionClicked(doctorId)
                     } else {
-                        // Open dialog to add report for this doctor
                         memberDetailsViewModel.onAddReportClicked(doctorId)
                     }
                 },
@@ -119,5 +123,26 @@ fun DoctorDetailsScreen(
                 }
             }
         }
+    }
+
+    // --- DIALOGS ---
+    if (showAddPrescriptionDialog || editingPrescription != null) {
+        AddOrEditPrescriptionDialog(
+            memberId = currentMemberId ?: "",
+            prescriptionToEdit = editingPrescription,
+            onDismiss = { memberDetailsViewModel.onDismissDialogs() },
+            onAdd = { memberDetailsViewModel.addPrescription(it) },
+            onUpdate = { id, doc, notes -> memberDetailsViewModel.updatePrescriptionDetails(id, doc, notes) }
+        )
+    }
+
+    if (showAddReportDialog || editingReport != null) {
+        AddOrEditReportDialog(
+            memberId = currentMemberId ?: "",
+            reportToEdit = editingReport,
+            onDismiss = { memberDetailsViewModel.onDismissDialogs() },
+            onAdd = { memberDetailsViewModel.addReport(it) },
+            onUpdate = { id, name, notes -> memberDetailsViewModel.updateReportDetails(id, name, notes) }
+        )
     }
 }

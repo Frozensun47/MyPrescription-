@@ -22,6 +22,8 @@ import java.util.*
 class MemberDetailsViewModel(application: Application, private val repository: AppRepository) : AndroidViewModel(application) {
 
     private val _currentMemberId = MutableStateFlow<String?>(null)
+    val currentMemberId: StateFlow<String?> = _currentMemberId.asStateFlow() // Expose public flow
+
     private val _selectedDoctorId = MutableStateFlow<String?>(null)
 
     // --- STATE FLOWS ---
@@ -167,7 +169,6 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         }
     }
 
-    // THIS FUNCTION IS NOW INCLUDED
     fun addImagesToPrescription(prescriptionId: String, pickedImageUris: List<Uri>) {
         viewModelScope.launch {
             val currentPrescription = allPrescriptions.value.find { it.id == prescriptionId } ?: return@launch
