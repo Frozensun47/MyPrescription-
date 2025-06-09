@@ -73,37 +73,26 @@ fun ViewDocumentScreen(
     onNavigateUp: () -> Unit
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     var selectedFilePaths by remember { mutableStateOf<Set<String>>(emptySet()) }
     val isInSelectionMode = selectedFilePaths.isNotEmpty()
     var imageViewerState by remember { mutableStateOf<ImageViewerState?>(null) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
-    val latestDocument by remember(documentType, documentId) {
-        derivedStateOf {
-            when (documentType) {
-                "prescription" -> memberDetailsViewModel.prescriptions.value.find { it.id == documentId }?.imageUri
-                "report" -> memberDetailsViewModel.reports.value.find { it.id == documentId }?.fileUri
-                else -> ""
-            } ?: ""
+    val prescriptions by memberDetailsViewModel.prescriptions.collectAsState()
+    val reports by memberDetailsViewModel.reports.collectAsState()
+
+    val (filePaths, initialNotes) = remember(documentType, documentId, prescriptions, reports) {
+        if (documentType == "prescription") {
+            val p = prescriptions.find { it.id == documentId }
+            (p?.imageUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()) to (p?.notes ?: "")
+        } else if (documentType == "report") {
+            val r = reports.find { it.id == documentId }
+            (r?.fileUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()) to (r?.notes ?: "")
+        } else {
+            emptyList<String>() to ""
         }
     }
 
-    val filePaths by remember(latestDocument) {
-        derivedStateOf {
-            latestDocument.split(',').filter { it.isNotBlank() }
-        }
-    }
-
-    val initialNotes by remember(documentId, documentType) {
-        derivedStateOf {
-            when (documentType) {
-                "prescription" -> memberDetailsViewModel.prescriptions.value.find { it.id == documentId }?.notes
-                "report" -> memberDetailsViewModel.reports.value.find { it.id == documentId }?.notes
-                else -> null
-            } ?: ""
-        }
-    }
     var notesText by remember(initialNotes) { mutableStateOf(initialNotes) }
 
     LaunchedEffect(notesText) {
@@ -118,19 +107,9 @@ fun ViewDocumentScreen(
     }
 
     val importImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri> ->
-        if (uris.isEmpty()) return@rememberLauncherForActivityResult
-        coroutineScope.launch {
-            val newPaths = uris.mapNotNull { uri ->
-                saveFileToInternalStorage(context, uri, "prescription").takeIf { it.isNotBlank() }
-            }
-
-            if (newPaths.isNotEmpty()) {
-                val allPaths = (filePaths + newPaths).joinToString(",")
-                memberDetailsViewModel.updatePrescriptionImageUris(documentId, allPaths)
-                Toast.makeText(context, "${newPaths.size} image(s) imported!", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(context, "Error importing image(s).", Toast.LENGTH_SHORT).show()
-            }
+        if (uris.isNotEmpty()) {
+            memberDetailsViewModel.addImagesToPrescription(documentId, uris)
+            Toast.makeText(context, "Importing ${uris.size} image(s)...", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -154,8 +133,6 @@ fun ViewDocumentScreen(
                 },
                 actions = {
                     if (isInSelectionMode) {
-                        // In a real app, you'd add share/download functionality here.
-                        // For now, they are placeholders.
                         IconButton(onClick = { /* Share Logic */ }) { Icon(Icons.Default.Share, "Share") }
                         IconButton(onClick = { /* Download Logic */ }) { Icon(Icons.Default.Download, "Download") }
                         IconButton(onClick = { showDeleteConfirmation = true }) { Icon(Icons.Default.Delete, "Delete") }
@@ -169,7 +146,6 @@ fun ViewDocumentScreen(
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
-            // Document Grid (takes up remaining space)
             if (filePaths.isEmpty()) {
                 val emptyMessage = if (documentType == "prescription") "No images have been added yet. Tap the '+' button to add one." else "No files have been added yet."
                 EmptyStateView(emptyMessage, modifier = Modifier.weight(1f))
@@ -177,9 +153,9 @@ fun ViewDocumentScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 120.dp),
                     modifier = Modifier
-                        .weight(1f) // This is the key change! It makes the grid fill the available space.
-                        .padding(horizontal = 16.dp), // Apply horizontal padding to the grid itself
-                    contentPadding = PaddingValues(vertical = 16.dp), // Apply vertical padding within the grid content
+                        .weight(1f)
+                        .padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -208,7 +184,6 @@ fun ViewDocumentScreen(
                 }
             }
 
-            // Notes Section
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -223,25 +198,24 @@ fun ViewDocumentScreen(
                     label = { Text("Add or edit notes here...") },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 100.dp, max = 200.dp) // Use heightIn for flexibility
+                        .heightIn(min = 100.dp, max = 200.dp)
                         .verticalScroll(rememberScrollState()),
                     shape = MaterialTheme.shapes.medium
                 )
             }
         }
 
-        // Floating Action Button (placed in a Box to layer it over content)
         if (documentType == "prescription" && !isInSelectionMode) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues) // Respect the padding from the Scaffold
+                    .padding(paddingValues)
             ) {
                 FloatingActionButton(
                     onClick = { importImageLauncher.launch("image/*") },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp) // Adjust FAB padding
+                        .padding(end = 16.dp, bottom = 16.dp)
                 ) {
                     Icon(Icons.Filled.AddPhotoAlternate, "Import Image")
                 }
@@ -398,7 +372,6 @@ private fun ImagePager(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                // Use systemBarsPadding() to push content away from system bars
                 .systemBarsPadding()
         ) {
             Row(

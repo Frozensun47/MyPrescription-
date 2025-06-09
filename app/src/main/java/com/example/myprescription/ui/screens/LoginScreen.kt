@@ -10,15 +10,18 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +35,10 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.myprescription.R
 import com.example.myprescription.ViewModel.AuthViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -100,10 +107,10 @@ fun LoginScreen(
         ) {
             Column(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.weight(1f))
+                // Spacer at the top to push content slightly down
+                Spacer(modifier = Modifier.weight(0.7f))
 
                 AnimatedVisibility(
                     visible = isVisible,
@@ -119,7 +126,7 @@ fun LoginScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 AnimatedVisibility(
                     visible = isVisible,
@@ -134,7 +141,7 @@ fun LoginScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 AnimatedVisibility(
                     visible = isVisible,
@@ -150,14 +157,35 @@ fun LoginScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
+                // --- START: Added Animation ---
+                AnimatedVisibility(
+                    visible = isVisible,
+                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 800)) +
+                            slideInVertically(initialOffsetY = { it / 2 }, animationSpec = tween(1000, delayMillis = 600))
+                ) {
+                    // This composable will render the Lottie animation.
+                    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.prescription_animation))
+                    LottieAnimation(
+                        composition = composition,
+                        iterations = LottieConstants.IterateForever, // Loop the animation
+                        modifier = Modifier
+                            .size(200.dp)
+                            .padding(top = 30.dp)
+//                            .clip(RoundedCornerShape(20.dp))
+//                            .background(Color.White),
+                    )
+                }
+                // --- END: Added Animation ---
+
+                // This spacer pushes the content below it to the bottom.
+                Spacer(modifier = Modifier.weight(1.0f)) // Adjusted weight to make room for animation
 
                 TermsAndConditionsCheckbox(
                     checked = termsAccepted,
                     onCheckedChange = onTermsAcceptedChange
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(25.dp))
 
                 Button(
                     onClick = launchSignIn,
@@ -173,6 +201,7 @@ fun LoginScreen(
                         fontSize = 16.sp,
                     )
                 }
+                Spacer(modifier = Modifier.height(150.dp)) // Add some bottom padding
             }
 
             if (isLoading) {
@@ -181,7 +210,6 @@ fun LoginScreen(
         }
     }
 }
-
 
 @Composable
 private fun TermsAndConditionsCheckbox(

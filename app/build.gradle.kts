@@ -76,7 +76,7 @@ dependencies {
     // ADD the new Credential Manager libraries
     implementation("androidx.credentials:credentials:1.2.2")
     implementation("androidx.credentials:credentials-play-services-auth:1.2.2")
-
+    implementation("com.airbnb.android:lottie-compose:6.4.0")
     // Coroutines for background tasks
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")

@@ -20,6 +20,7 @@ import java.util.UUID
 data class Prescription(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val memberId: String, // Foreign key to Member
+    val doctorId: String?, // Foreign key to Doctor
     val doctorName: String,
     val date: Date = Date(), // Will use TypeConverter
     val notes: String? = null,

@@ -8,6 +8,7 @@ import java.util.Date
 data class Report(
     @PrimaryKey val id: String = java.util.UUID.randomUUID().toString(),
     val memberId: String,
+    val doctorId: String?, // Foreign key to Doctor
     val reportName: String,
     val date: Date,
     val notes: String? = null,

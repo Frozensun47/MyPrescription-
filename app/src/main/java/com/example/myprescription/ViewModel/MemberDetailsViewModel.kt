@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.myprescription.MyPrescriptionApplication
 import com.example.myprescription.data.repository.AppRepository
+import com.example.myprescription.model.Doctor
 import com.example.myprescription.model.Prescription
 import com.example.myprescription.model.Report
 import com.example.myprescription.util.saveFileToInternalStorage
@@ -20,20 +21,17 @@ class MemberDetailsViewModel(application: Application, private val repository: A
 
     private val _currentMemberId = MutableStateFlow<String?>(null)
 
+    // --- STATE FLOWS ---
     val prescriptions: StateFlow<List<Prescription>> = _currentMemberId.flatMapLatest { memberId ->
-        if (memberId != null) {
-            repository.getPrescriptionsForMember(memberId)
-        } else {
-            flowOf(emptyList())
-        }
+        if (memberId != null) repository.getPrescriptionsForMember(memberId) else flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val reports: StateFlow<List<Report>> = _currentMemberId.flatMapLatest { memberId ->
-        if (memberId != null) {
-            repository.getReportsForMember(memberId)
-        } else {
-            flowOf(emptyList())
-        }
+        if (memberId != null) repository.getReportsForMember(memberId) else flowOf(emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val doctors: StateFlow<List<Doctor>> = _currentMemberId.flatMapLatest { memberId ->
+        if (memberId != null) repository.getDoctorsForMember(memberId) else flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _showAddPrescriptionDialog = MutableStateFlow(false)
@@ -42,53 +40,41 @@ class MemberDetailsViewModel(application: Application, private val repository: A
     private val _showAddReportDialog = MutableStateFlow(false)
     val showAddReportDialog: StateFlow<Boolean> = _showAddReportDialog.asStateFlow()
 
+    private val _showAddDoctorDialog = MutableStateFlow(false)
+    val showAddDoctorDialog: StateFlow<Boolean> = _showAddDoctorDialog.asStateFlow()
+
     private val _editingPrescription = MutableStateFlow<Prescription?>(null)
     val editingPrescription: StateFlow<Prescription?> = _editingPrescription.asStateFlow()
 
     private val _editingReport = MutableStateFlow<Report?>(null)
     val editingReport: StateFlow<Report?> = _editingReport.asStateFlow()
 
+    private val _editingDoctor = MutableStateFlow<Doctor?>(null)
+    val editingDoctor: StateFlow<Doctor?> = _editingDoctor.asStateFlow()
+
+    private var targetDoctorIdForAdd: String? = null
     private val _targetPrescriptionIdForUpload = MutableStateFlow<String?>(null)
     private val _targetReportIdForUpload = MutableStateFlow<String?>(null)
 
+    // --- FUNCTIONS ---
     fun loadMemberData(memberId: String) {
         _currentMemberId.value = memberId
     }
 
-    fun addPrescription(prescriptionData: Prescription) {
-        viewModelScope.launch {
-            val memberId = _currentMemberId.value ?: return@launch
-            val finalPrescription = prescriptionData.copy(memberId = memberId, imageUri = "")
-            repository.insertPrescription(finalPrescription)
-        }
-    }
+    // DOCTOR methods
+    fun addDoctor(doctor: Doctor) = viewModelScope.launch { repository.insertDoctor(doctor) }
+    fun updateDoctor(doctor: Doctor) = viewModelScope.launch { repository.updateDoctor(doctor) }
+    fun deleteDoctor(doctor: Doctor) = viewModelScope.launch { repository.deleteDoctor(doctor) }
 
-    fun addReport(reportData: Report) {
-        viewModelScope.launch {
-            val memberId = _currentMemberId.value ?: return@launch
-            val finalReport = reportData.copy(memberId = memberId, fileUri = "")
-            repository.insertReport(finalReport)
-        }
-    }
-
+    // PRESCRIPTION methods
+    fun addPrescription(prescription: Prescription) = viewModelScope.launch { repository.insertPrescription(prescription.copy(doctorId = targetDoctorIdForAdd)) }
     fun updatePrescriptionDetails(id: String, doctorName: String, notes: String) {
         viewModelScope.launch {
             val prescription = prescriptions.value.find { it.id == id } ?: return@launch
             val updatedPrescription = prescription.copy(doctorName = doctorName, notes = notes.ifBlank { null })
             repository.updatePrescription(updatedPrescription)
-            onDismissDialogs()
         }
     }
-
-    fun updateReportDetails(id: String, reportName: String, notes: String) {
-        viewModelScope.launch {
-            val report = reports.value.find { it.id == id } ?: return@launch
-            val updatedReport = report.copy(reportName = reportName, notes = notes.ifBlank { null })
-            repository.updateReport(updatedReport)
-            onDismissDialogs()
-        }
-    }
-
     fun deletePrescription(prescription: Prescription) {
         viewModelScope.launch {
             prescription.imageUri?.split(',')?.filter { it.isNotBlank() }?.forEach { path ->
@@ -98,6 +84,15 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         }
     }
 
+    // REPORT methods
+    fun addReport(report: Report) = viewModelScope.launch { repository.insertReport(report.copy(doctorId = targetDoctorIdForAdd)) }
+    fun updateReportDetails(id: String, reportName: String, notes: String) {
+        viewModelScope.launch {
+            val report = reports.value.find { it.id == id } ?: return@launch
+            val updatedReport = report.copy(reportName = reportName, notes = notes.ifBlank { null })
+            repository.updateReport(updatedReport)
+        }
+    }
     fun deleteReport(report: Report) {
         viewModelScope.launch {
             report.fileUri?.split(',')?.filter { it.isNotBlank() }?.forEach { path ->
@@ -107,34 +102,7 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         }
     }
 
-    fun deleteFileFromPrescription(prescriptionId: String, pathToDelete: String) {
-        viewModelScope.launch {
-            val prescription = prescriptions.value.find { it.id == prescriptionId } ?: return@launch
-            val updatedPaths = prescription.imageUri
-                ?.split(',')
-                ?.filter { it.isNotBlank() && it != pathToDelete }
-                ?.joinToString(",")
-                ?: ""
-
-            repository.updatePrescription(prescription.copy(imageUri = updatedPaths))
-            try { File(pathToDelete).delete() } catch (e: Exception) { e.printStackTrace() }
-        }
-    }
-
-    fun deleteFileFromReport(reportId: String, pathToDelete: String) {
-        viewModelScope.launch {
-            val report = reports.value.find { it.id == reportId } ?: return@launch
-            val updatedPaths = report.fileUri
-                ?.split(',')
-                ?.filter { it.isNotBlank() && it != pathToDelete }
-                ?.joinToString(",")
-                ?: ""
-
-            repository.updateReport(report.copy(fileUri = updatedPaths))
-            try { File(pathToDelete).delete() } catch (e: Exception) { e.printStackTrace() }
-        }
-    }
-
+    // FILE HANDLING
     fun setTargetPrescriptionForUpload(prescriptionId: String) { _targetPrescriptionIdForUpload.value = prescriptionId }
     fun setTargetReportForUpload(reportId: String) { _targetReportIdForUpload.value = reportId }
 
@@ -142,18 +110,34 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         viewModelScope.launch {
             val targetId = _targetPrescriptionIdForUpload.value ?: return@launch
             val currentPrescription = prescriptions.value.find { it.id == targetId } ?: return@launch
+            val existingPaths = currentPrescription.imageUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
+            val newPaths = existingPaths.toMutableList()
+            for (uri in pickedImageUris) {
+                val imagePath = saveFileToInternalStorage(getApplication(), uri, "prescription")
+                if(imagePath.isNotBlank()) newPaths.add(imagePath)
+            }
+            val updatedPrescription = currentPrescription.copy(imageUri = newPaths.joinToString(","))
+            repository.updatePrescription(updatedPrescription)
+            _targetPrescriptionIdForUpload.value = null
+        }
+    }
 
+    // ADD THIS FUNCTION BACK
+    fun addImagesToPrescription(prescriptionId: String, pickedImageUris: List<Uri>) {
+        viewModelScope.launch {
+            val currentPrescription = prescriptions.value.find { it.id == prescriptionId } ?: return@launch
             val existingPaths = currentPrescription.imageUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
             val newPaths = existingPaths.toMutableList()
 
             for (uri in pickedImageUris) {
                 val imagePath = saveFileToInternalStorage(getApplication(), uri, "prescription")
-                if(imagePath.isNotBlank()) newPaths.add(imagePath)
+                if (imagePath.isNotBlank()) {
+                    newPaths.add(imagePath)
+                }
             }
 
             val updatedPrescription = currentPrescription.copy(imageUri = newPaths.joinToString(","))
             repository.updatePrescription(updatedPrescription)
-            _targetPrescriptionIdForUpload.value = null
         }
     }
 
@@ -161,21 +145,19 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         viewModelScope.launch {
             val targetId = _targetReportIdForUpload.value ?: return@launch
             val currentReport = reports.value.find { it.id == targetId } ?: return@launch
-
             val existingPaths = currentReport.fileUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
             val newPaths = existingPaths.toMutableList()
-
             for (uri in pickedFileUris) {
                 val filePath = saveFileToInternalStorage(getApplication(), uri, "report")
                 if(filePath.isNotBlank()) newPaths.add(filePath)
             }
-
             val updatedReport = currentReport.copy(fileUri = newPaths.joinToString(","))
             repository.updateReport(updatedReport)
             _targetReportIdForUpload.value = null
         }
     }
 
+    // RESTORED FUNCTIONS
     fun updatePrescriptionNotes(prescriptionId: String, newNotes: String) {
         viewModelScope.launch {
             val prescription = prescriptions.value.find { it.id == prescriptionId } ?: return@launch
@@ -190,22 +172,68 @@ class MemberDetailsViewModel(application: Application, private val repository: A
         }
     }
 
-    fun updatePrescriptionImageUris(prescriptionId: String, newUris: String) {
+    fun deleteMultipleFiles(documentId: String, documentType: String, pathsToDelete: Set<String>) {
         viewModelScope.launch {
-            val prescription = prescriptions.value.find { it.id == prescriptionId } ?: return@launch
-            repository.updatePrescription(prescription.copy(imageUri = newUris))
+            if (documentType == "prescription") {
+                val prescription = prescriptions.value.find { it.id == documentId } ?: return@launch
+                val updatedPaths = prescription.imageUri
+                    ?.split(',')
+                    ?.filter { it.isNotBlank() && it !in pathsToDelete }
+                    ?.joinToString(",") ?: ""
+                repository.updatePrescription(prescription.copy(imageUri = updatedPaths))
+            } else { // "report"
+                val report = reports.value.find { it.id == documentId } ?: return@launch
+                val updatedPaths = report.fileUri
+                    ?.split(',')
+                    ?.filter { it.isNotBlank() && it !in pathsToDelete }
+                    ?.joinToString(",") ?: ""
+                repository.updateReport(report.copy(fileUri = updatedPaths))
+            }
+
+            pathsToDelete.forEach { path ->
+                try {
+                    File(path).delete()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
     }
 
-    fun onAddPrescriptionClicked() { _showAddPrescriptionDialog.value = true }
-    fun onAddReportClicked() { _showAddReportDialog.value = true }
+    // DIALOG VISIBILITY & EDITING STATE
+    fun onAddDoctorClicked() {
+        _editingDoctor.value = null
+        _showAddDoctorDialog.value = true
+    }
+
+    fun onEditDoctorClicked(doctor: Doctor) {
+        _editingDoctor.value = doctor
+        _showAddDoctorDialog.value = true
+    }
+
+    fun onAddPrescriptionClicked(doctorId: String) {
+        targetDoctorIdForAdd = doctorId
+        _editingPrescription.value = null
+        _showAddPrescriptionDialog.value = true
+    }
+
+    fun onAddReportClicked(doctorId: String) {
+        targetDoctorIdForAdd = doctorId
+        _editingReport.value = null
+        _showAddReportDialog.value = true
+    }
+
     fun onEditPrescriptionClicked(prescription: Prescription) { _editingPrescription.value = prescription }
     fun onEditReportClicked(report: Report) { _editingReport.value = report }
+
     fun onDismissDialogs() {
         _showAddPrescriptionDialog.value = false
         _showAddReportDialog.value = false
+        _showAddDoctorDialog.value = false
         _editingPrescription.value = null
         _editingReport.value = null
+        _editingDoctor.value = null
+        targetDoctorIdForAdd = null
     }
 
     companion object {
@@ -215,35 +243,6 @@ class MemberDetailsViewModel(application: Application, private val repository: A
                 val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) as MyPrescriptionApplication
                 val repository = application.repository ?: throw IllegalStateException("Repository not initialized")
                 return MemberDetailsViewModel(application, repository) as T
-            }
-        }
-    }
-    fun deleteMultipleFiles(documentId: String, documentType: String, pathsToDelete: Set<String>) {
-        viewModelScope.launch {
-            val updatedPaths: String
-            if (documentType == "prescription") {
-                val prescription = prescriptions.value.find { it.id == documentId } ?: return@launch
-                updatedPaths = prescription.imageUri
-                    ?.split(',')
-                    ?.filter { it.isNotBlank() && it !in pathsToDelete }
-                    ?.joinToString(",") ?: ""
-                repository.updatePrescription(prescription.copy(imageUri = updatedPaths))
-            } else {
-                val report = reports.value.find { it.id == documentId } ?: return@launch
-                updatedPaths = report.fileUri
-                    ?.split(',')
-                    ?.filter { it.isNotBlank() && it !in pathsToDelete }
-                    ?.joinToString(",") ?: ""
-                repository.updateReport(report.copy(fileUri = updatedPaths))
-            }
-
-            // Delete files from storage
-            pathsToDelete.forEach { path ->
-                try {
-                    File(path).delete()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
             }
         }
     }
