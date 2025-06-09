@@ -44,48 +44,43 @@ fun MemberDetailsScreen(
     memberName: String,
     memberDetailsViewModel: MemberDetailsViewModel,
     onNavigateToViewDocument: (documentId: String, documentType: String, documentTitle: String) -> Unit,
+    onNavigateToDoctorDetails: (doctorId: String, doctorName: String) -> Unit,
     onNavigateUp: () -> Unit
 ) {
-    // --- STATE COLLECTION ---
-    val prescriptions by memberDetailsViewModel.prescriptions.collectAsState()
-    val reports by memberDetailsViewModel.reports.collectAsState()
+    val prescriptions by memberDetailsViewModel.allPrescriptions.collectAsState()
+    val reports by memberDetailsViewModel.allReports.collectAsState()
     val doctors by memberDetailsViewModel.doctors.collectAsState()
-
-    // Dialog and editing states
+    val showAddDoctorDialog by memberDetailsViewModel.showAddDoctorDialog.collectAsState()
+    val editingDoctor by memberDetailsViewModel.editingDoctor.collectAsState()
     val showAddPrescriptionDialog by memberDetailsViewModel.showAddPrescriptionDialog.collectAsState()
     val showAddReportDialog by memberDetailsViewModel.showAddReportDialog.collectAsState()
-    val showAddDoctorDialog by memberDetailsViewModel.showAddDoctorDialog.collectAsState()
     val editingPrescription by memberDetailsViewModel.editingPrescription.collectAsState()
     val editingReport by memberDetailsViewModel.editingReport.collectAsState()
-    val editingDoctor by memberDetailsViewModel.editingDoctor.collectAsState()
-
     var itemToDelete by remember { mutableStateOf<Any?>(null) }
-
-    // --- TABS & PAGER ---
     val tabs = listOf("Doctors", "All Prescriptions", "All Reports")
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
 
-    // --- ACTIVITY LAUNCHERS ---
-    val prescriptionImagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents(),
-        onResult = { uris: List<Uri> ->
-            if (uris.isNotEmpty()) memberDetailsViewModel.updatePrescriptionWithImages(uris)
+    val quickPrescriptionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            memberDetailsViewModel.createPrescriptionWithAttachments(uris)
         }
-    )
-    val reportFilePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents(),
-        onResult = { uris: List<Uri> ->
-            if (uris.isNotEmpty()) memberDetailsViewModel.updateReportWithFiles(uris)
-        }
-    )
+    }
 
-    // Load data on first composition
+    val quickReportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            memberDetailsViewModel.createReportWithAttachments(uris)
+        }
+    }
+
     LaunchedEffect(memberId) {
         memberDetailsViewModel.loadMemberData(memberId)
     }
 
-    // --- UI SCAFFOLD ---
     Scaffold(
         topBar = {
             TopAppBar(
@@ -95,7 +90,6 @@ fun MemberDetailsScreen(
             )
         },
         floatingActionButton = {
-            // FAB is now only for adding a new Doctor, only on the Doctors tab
             if (pagerState.currentPage == 0) {
                 FloatingActionButton(
                     onClick = { memberDetailsViewModel.onAddDoctorClicked() },
@@ -108,7 +102,6 @@ fun MemberDetailsScreen(
         },
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            // --- TABS ---
             PrimaryTabRow(
                 selectedTabIndex = pagerState.currentPage,
                 containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
@@ -118,39 +111,37 @@ fun MemberDetailsScreen(
                     Tab(
                         selected = pagerState.currentPage == index,
                         onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
-                        text = { Text(title, fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal) },
-                        selectedContentColor = MaterialTheme.colorScheme.primary,
-                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = { Text(title) }
                     )
                 }
             }
 
-            // --- HORIZONTAL PAGER (for tab content) ---
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                 when (page) {
                     0 -> DoctorList(
                         doctors = doctors,
-                        onAddPrescriptionClick = { memberDetailsViewModel.onAddPrescriptionClicked(it.id) },
-                        onAddReportClick = { memberDetailsViewModel.onAddReportClicked(it.id) },
+                        onDoctorClick = { onNavigateToDoctorDetails(it.id, it.name) },
+                        onAddPrescriptionClick = {
+                            memberDetailsViewModel.targetDoctorForAttachment.value = it
+                            quickPrescriptionLauncher.launch("image/*")
+                        },
+                        onAddReportClick = {
+                            memberDetailsViewModel.targetDoctorForAttachment.value = it
+                            quickReportLauncher.launch("*/*")
+                        },
                         onDeleteClick = { itemToDelete = it },
                         onEditClick = { memberDetailsViewModel.onEditDoctorClicked(it) }
                     )
                     1 -> PrescriptionList(
                         prescriptions = prescriptions,
-                        onUploadClick = {
-                            memberDetailsViewModel.setTargetPrescriptionForUpload(it.id)
-                            prescriptionImagePicker.launch("image/*")
-                        },
+                        onUploadClick = { memberDetailsViewModel.setTargetPrescriptionForUpload(it.id) },
                         onViewClick = { p -> if (p.imageUri?.isNotBlank() == true) onNavigateToViewDocument(p.id, "prescription", "Dr. ${p.doctorName}'s P.") },
                         onDeleteClick = { itemToDelete = it },
                         onEditClick = { memberDetailsViewModel.onEditPrescriptionClicked(it) }
                     )
                     2 -> ReportList(
                         reports = reports,
-                        onUploadClick = {
-                            memberDetailsViewModel.setTargetReportForUpload(it.id)
-                            reportFilePicker.launch("*/*")
-                        },
+                        onUploadClick = { memberDetailsViewModel.setTargetReportForUpload(it.id) },
                         onViewClick = { r -> if (r.fileUri?.isNotBlank() == true) onNavigateToViewDocument(r.id, "report", r.reportName) },
                         onDeleteClick = { itemToDelete = it },
                         onEditClick = { memberDetailsViewModel.onEditReportClicked(it) }
@@ -160,7 +151,6 @@ fun MemberDetailsScreen(
         }
     }
 
-    // --- DIALOGS ---
     if (showAddDoctorDialog || editingDoctor != null) {
         AddOrEditDoctorDialog(
             memberId = memberId,
@@ -216,10 +206,12 @@ fun MemberDetailsScreen(
     }
 }
 
-// --- LIST COMPOSABLES ---
+// --- ALL COMPOSABLE FUNCTIONS BELOW ARE NOW AT THE TOP-LEVEL ---
+
 @Composable
 fun DoctorList(
     doctors: List<Doctor>,
+    onDoctorClick: (Doctor) -> Unit,
     onAddPrescriptionClick: (Doctor) -> Unit,
     onAddReportClick: (Doctor) -> Unit,
     onDeleteClick: (Doctor) -> Unit,
@@ -235,7 +227,14 @@ fun DoctorList(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(doctors, key = { it.id }) { doctor ->
-            DoctorCard(doctor, onAddPrescriptionClick, onAddReportClick, onDeleteClick, onEditClick)
+            DoctorCard(
+                doctor = doctor,
+                onAddPrescriptionClick = { onAddPrescriptionClick(doctor) },
+                onAddReportClick = { onAddReportClick(doctor) },
+                onDeleteClick = { onDeleteClick(doctor) },
+                onEditClick = { onEditClick(doctor) },
+                onCardClick = { onDoctorClick(doctor) }
+            )
         }
     }
 }
@@ -286,17 +285,19 @@ fun ReportList(
     }
 }
 
-// --- CARD COMPOSABLES ---
 @Composable
 fun DoctorCard(
     doctor: Doctor,
-    onAddPrescriptionClick: (Doctor) -> Unit,
-    onAddReportClick: (Doctor) -> Unit,
-    onDeleteClick: (Doctor) -> Unit,
-    onEditClick: (Doctor) -> Unit
+    onCardClick: () -> Unit,
+    onAddPrescriptionClick: () -> Unit,
+    onAddReportClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    onEditClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onCardClick),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
     ) {
@@ -319,14 +320,14 @@ fun DoctorCard(
                         )
                     }
                 }
-                IconButton(onClick = { onEditClick(doctor) }) { Icon(Icons.Default.Edit, "Edit Doctor") }
-                IconButton(onClick = { onDeleteClick(doctor) }) { Icon(Icons.Default.Delete, "Delete Doctor", tint = MaterialTheme.colorScheme.error) }
+                IconButton(onClick = onEditClick) { Icon(Icons.Default.Edit, "Edit Doctor") }
+                IconButton(onClick = onDeleteClick) { Icon(Icons.Default.Delete, "Delete Doctor", tint = MaterialTheme.colorScheme.error) }
             }
-            Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onAddPrescriptionClick(doctor) }) { Text("Add Prescription") }
-                OutlinedButton(onClick = { onAddReportClick(doctor) }) { Text("Add Report") }
-            }
+//            Spacer(Modifier.height(16.dp))
+//            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+//                Button(onClick = onAddPrescriptionClick) { Text("Add Prescription") }
+//                OutlinedButton(onClick = onAddReportClick) { Text("Add Report") }
+//            }
         }
     }
 }
@@ -388,7 +389,9 @@ fun PrescriptionCard(
                         painter = rememberAsyncImagePainter(model = File(imagePaths.first())),
                         contentDescription = "Prescription Image",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(40.dp).clip(MaterialTheme.shapes.small)
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(MaterialTheme.shapes.small)
                     )
                     Spacer(Modifier.width(12.dp))
                     Text(
@@ -403,14 +406,15 @@ fun PrescriptionCard(
 
             Row(modifier = Modifier.padding(top = 8.dp)) {
                 Button(onClick = { onUploadClick(prescription) }) {
-                    Icon(Icons.Default.AddPhotoAlternate, "Add photos", modifier = Modifier.size(ButtonDefaults.IconSize))
+                    Icon(Icons.Default.AddPhotoAlternate, "Add prescription", modifier = Modifier.size(ButtonDefaults.IconSize))
                     Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                    Text("Add Photos")
+                    Text("Add Prescription")
                 }
             }
         }
     }
 }
+
 
 @Composable
 fun ReportCard(
@@ -438,8 +442,18 @@ fun ReportCard(
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(report.reportName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(formatDate(report.date), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        report.reportName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        formatDate(report.date),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 IconButton(onClick = { onEditClick(report) }) { Icon(Icons.Default.Edit, "Edit") }
                 IconButton(onClick = { onDeleteClick(report) }) { Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error) }
@@ -466,7 +480,12 @@ fun ReportCard(
                         .background(MaterialTheme.colorScheme.surface)
                         .padding(8.dp)
                 ) {
-                    Icon(Icons.Default.Folder, contentDescription = "Folder Icon", modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.secondary)
+                    Icon(
+                        Icons.Default.Folder,
+                        contentDescription = "Folder Icon",
+                        modifier = Modifier.size(40.dp),
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
                     Spacer(Modifier.width(12.dp))
                     Text(
                         text = if (filePaths.size == 1) "View 1 file" else "View ${filePaths.size} files",
@@ -493,7 +512,22 @@ fun formatDate(date: Date): String {
     return SimpleDateFormat("dd MMM yy, hh:mm a", Locale.getDefault()).format(date)
 }
 
-// --- DIALOG COMPOSABLES ---
+@Composable
+fun EmptyStateView(message: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp), contentAlignment = Alignment.Center
+    ) {
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 @Composable
 fun AddOrEditDoctorDialog(
     memberId: String,
@@ -508,9 +542,11 @@ fun AddOrEditDoctorDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = MaterialTheme.shapes.large) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
-                    text = if (isEditing) "Edit Doctor" else "Add New Doctor",
+                    text = if(isEditing) "Edit Doctor" else "Add New Doctor",
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(24.dp)
                 )
@@ -518,21 +554,13 @@ fun AddOrEditDoctorDialog(
                     modifier = Modifier.padding(horizontal = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it; nameError = null },
-                        label = { Text("Doctor's Name") },
-                        isError = nameError != null,
-                        supportingText = { if (nameError != null) Text(nameError!!) }
-                    )
-                    OutlinedTextField(
-                        value = specialization,
-                        onValueChange = { specialization = it },
-                        label = { Text("Specialization (Optional)") }
-                    )
+                    OutlinedTextField(value = name, onValueChange = { name = it; nameError = null }, label = { Text("Doctor's Name") }, isError = nameError != null, supportingText = { if (nameError != null) Text(nameError!!) })
+                    OutlinedTextField(value = specialization, onValueChange = { specialization = it }, label = { Text("Specialization / Clinic Name (Optional)") })
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.End,
                 ) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -573,9 +601,11 @@ fun AddOrEditPrescriptionDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = MaterialTheme.shapes.large) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
-                    text = if (isEditing) "Edit Prescription" else "Add New Prescription",
+                    text = if(isEditing) "Edit Prescription" else "Add New Prescription",
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(24.dp)
                 )
@@ -587,7 +617,9 @@ fun AddOrEditPrescriptionDialog(
                     OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes (Optional)") }, minLines = 3)
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.End,
                 ) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -625,7 +657,9 @@ fun AddOrEditReportDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = MaterialTheme.shapes.large) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
                     text = if (isEditing) "Edit Report" else "Add New Report",
                     style = MaterialTheme.typography.headlineSmall,
@@ -639,7 +673,9 @@ fun AddOrEditReportDialog(
                     OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes (Optional)") }, minLines = 3)
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.End,
                 ) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -659,20 +695,5 @@ fun AddOrEditReportDialog(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun EmptyStateView(message: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.fillMaxSize().padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            message,
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }

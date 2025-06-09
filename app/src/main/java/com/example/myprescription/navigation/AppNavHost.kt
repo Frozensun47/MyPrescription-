@@ -1,6 +1,6 @@
 package com.example.myprescription.navigation
 
-import android.util.Log // Import Log for logging
+import android.util.Log
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -19,9 +19,7 @@ import com.example.myprescription.ViewModel.FamilyViewModel
 import com.example.myprescription.ViewModel.MemberDetailsViewModel
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.io.File
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -34,6 +32,7 @@ object AppDestinations {
     const val MEMBER_DETAILS_FLOW_ROUTE = "member_details_flow"
     const val MEMBER_DETAILS_ROUTE = "member_details"
     const val VIEW_DOCUMENT_ROUTE = "view_document"
+    const val DOCTOR_DETAILS_ROUTE = "doctor_details"
     const val SETTINGS_ROUTE = "settings"
     const val ABOUT_ROUTE = "about"
     const val HELP_ROUTE = "help"
@@ -43,6 +42,8 @@ object AppDestinations {
     const val DOCUMENT_ID_ARG = "documentId"
     const val DOCUMENT_TYPE_ARG = "documentType"
     const val DOCUMENT_TITLE_ARG = "documentTitle"
+    const val DOCTOR_ID_ARG = "doctorId"
+    const val DOCTOR_NAME_ARG = "doctorName"
 }
 
 fun String.encodeUri(): String = URLEncoder.encode(this, StandardCharsets.UTF_8.toString())
@@ -56,7 +57,6 @@ fun AppNavHost(
     val context = LocalContext.current
     val application = context.applicationContext as MyPrescriptionApplication
     val prefs = remember { Prefs(context) }
-    val coroutineScope = rememberCoroutineScope()
 
     val startDestination = remember {
         val currentUser = Firebase.auth.currentUser
@@ -141,19 +141,17 @@ fun AppNavHost(
         }
 
         composable(AppDestinations.SETTINGS_ROUTE) {
+            // This screen's code remains unchanged, but is included for completeness
             val authViewModel: AuthViewModel = viewModel()
             val firebaseUser by authViewModel.user.collectAsState()
             val currentUserId = firebaseUser?.uid
-
             val applicationScope = rememberCoroutineScope()
 
             if (currentUserId != null) {
                 SettingsScreen(
                     userId = currentUserId,
                     onNavigateUp = { navController.navigateUp() },
-                    onNavigateToChangePin = {
-                        navController.navigate(AppDestinations.PIN_SETUP_ROUTE)
-                    },
+                    onNavigateToChangePin = { navController.navigate(AppDestinations.PIN_SETUP_ROUTE) },
                     onLogout = {
                         authViewModel.logout()
                         application.onUserLogout()
@@ -163,30 +161,20 @@ fun AppNavHost(
                         applicationScope.launch {
                             val userToDelete = Firebase.auth.currentUser
                             if (userToDelete != null && userToDelete.uid == currentUserId) {
-                                // Clear local data associated with the user
-                                // A more robust solution would iterate through all member, prescription, and report files
-                                // and delete them from internal storage before clearing the database.
                                 application.repository?.clearAllDatabaseTables()
-                                prefs.clearAllData() // Clear all user-related preferences, including PIN
-
-                                userToDelete.delete()
-                                    .addOnCompleteListener { task ->
-                                        if (task.isSuccessful) {
-                                            Log.d("SettingsScreen", "Firebase user account deleted.")
-                                            authViewModel.logout()
-                                            application.onUserLogout()
-                                            navController.navigate(AppDestinations.LOGIN_ROUTE) { popUpTo(navController.graph.startDestinationId) { inclusive = true } }
-                                        } else {
-                                            Log.e("SettingsScreen", "Failed to delete Firebase account: ${task.exception?.message}")
-                                            // Handle case where re-authentication might be needed or show an error
-                                        }
+                                prefs.clearAllData()
+                                userToDelete.delete().addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        authViewModel.logout()
+                                        application.onUserLogout()
+                                        navController.navigate(AppDestinations.LOGIN_ROUTE) { popUpTo(navController.graph.startDestinationId) { inclusive = true } }
                                     }
+                                }
                             }
                         }
                     }
                 )
             } else {
-                // If currentUserId is null, navigate back to login to ensure user is authenticated
                 LaunchedEffect(Unit) {
                     navController.navigate(AppDestinations.LOGIN_ROUTE) { popUpTo(navController.graph.startDestinationId) { inclusive = true } }
                 }
@@ -196,15 +184,12 @@ fun AppNavHost(
         composable(AppDestinations.ABOUT_ROUTE) { AboutScreen(onNavigateUp = { navController.navigateUp() }) }
         composable(AppDestinations.HELP_ROUTE) { HelpScreen(onNavigateUp = { navController.navigateUp() }) }
 
-        // --- NESTED NAVIGATION GRAPH for member details and document viewing ---
         navigation(
             route = "${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}",
             startDestination = AppDestinations.MEMBER_DETAILS_ROUTE
         ) {
             composable(route = AppDestinations.MEMBER_DETAILS_ROUTE) { backStackEntry ->
-                val parentEntry = remember(backStackEntry) {
-                    navController.getBackStackEntry("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}")
-                }
+                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}") }
                 val memberDetailsViewModel: MemberDetailsViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = MemberDetailsViewModel.Factory)
                 val memberId = parentEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)
                 val memberName = parentEntry.arguments?.getString(AppDestinations.MEMBER_NAME_ARG)
@@ -216,6 +201,9 @@ fun AppNavHost(
                         memberDetailsViewModel = memberDetailsViewModel,
                         onNavigateToViewDocument = { docId, docType, docTitle ->
                             navController.navigate("${AppDestinations.VIEW_DOCUMENT_ROUTE}/$docId/$docType/${docTitle.encodeUri()}")
+                        },
+                        onNavigateToDoctorDetails = { doctorId, dName ->
+                            navController.navigate("${AppDestinations.DOCTOR_DETAILS_ROUTE}/$doctorId/${dName.encodeUri()}")
                         },
                         onNavigateUp = { navController.popBackStack() }
                     )
@@ -230,9 +218,7 @@ fun AppNavHost(
                     navArgument(AppDestinations.DOCUMENT_TITLE_ARG) { type = NavType.StringType }
                 )
             ) { backStackEntry ->
-                val parentEntry = remember(backStackEntry) {
-                    navController.getBackStackEntry("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}")
-                }
+                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}") }
                 val memberDetailsViewModel: MemberDetailsViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = MemberDetailsViewModel.Factory)
                 val documentId = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_ID_ARG)
                 val documentType = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_TYPE_ARG)
@@ -244,6 +230,31 @@ fun AppNavHost(
                         documentType = documentType,
                         documentTitle = documentTitle,
                         memberDetailsViewModel = memberDetailsViewModel,
+                        onNavigateUp = { navController.popBackStack() }
+                    )
+                }
+            }
+
+            composable(
+                route = "${AppDestinations.DOCTOR_DETAILS_ROUTE}/{${AppDestinations.DOCTOR_ID_ARG}}/{${AppDestinations.DOCTOR_NAME_ARG}}",
+                arguments = listOf(
+                    navArgument(AppDestinations.DOCTOR_ID_ARG) { type = NavType.StringType },
+                    navArgument(AppDestinations.DOCTOR_NAME_ARG) { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}") }
+                val memberDetailsViewModel: MemberDetailsViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = MemberDetailsViewModel.Factory)
+                val doctorId = backStackEntry.arguments?.getString(AppDestinations.DOCTOR_ID_ARG)
+                val doctorName = backStackEntry.arguments?.getString(AppDestinations.DOCTOR_NAME_ARG)?.decodeUri()
+
+                if (doctorId != null && doctorName != null) {
+                    DoctorDetailsScreen(
+                        doctorId = doctorId,
+                        doctorName = doctorName,
+                        memberDetailsViewModel = memberDetailsViewModel,
+                        onNavigateToViewDocument = { docId, docType, docTitle ->
+                            navController.navigate("${AppDestinations.VIEW_DOCUMENT_ROUTE}/$docId/$docType/${docTitle.encodeUri()}")
+                        },
                         onNavigateUp = { navController.popBackStack() }
                     )
                 }

@@ -26,7 +26,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -55,7 +54,6 @@ import androidx.core.content.FileProvider
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.myprescription.ViewModel.MemberDetailsViewModel
-import com.example.myprescription.util.saveFileToInternalStorage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -78,15 +76,16 @@ fun ViewDocumentScreen(
     var imageViewerState by remember { mutableStateOf<ImageViewerState?>(null) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
-    val prescriptions by memberDetailsViewModel.prescriptions.collectAsState()
-    val reports by memberDetailsViewModel.reports.collectAsState()
+    // Correctly reference the renamed properties from the ViewModel
+    val allPrescriptions by memberDetailsViewModel.allPrescriptions.collectAsState()
+    val allReports by memberDetailsViewModel.allReports.collectAsState()
 
-    val (filePaths, initialNotes) = remember(documentType, documentId, prescriptions, reports) {
+    val (filePaths, initialNotes) = remember(documentType, documentId, allPrescriptions, allReports) {
         if (documentType == "prescription") {
-            val p = prescriptions.find { it.id == documentId }
+            val p = allPrescriptions.find { it.id == documentId }
             (p?.imageUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()) to (p?.notes ?: "")
         } else if (documentType == "report") {
-            val r = reports.find { it.id == documentId }
+            val r = allReports.find { it.id == documentId }
             (r?.fileUri?.split(',')?.filter { it.isNotBlank() } ?: emptyList()) to (r?.notes ?: "")
         } else {
             emptyList<String>() to ""
@@ -109,7 +108,7 @@ fun ViewDocumentScreen(
     val importImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri> ->
         if (uris.isNotEmpty()) {
             memberDetailsViewModel.addImagesToPrescription(documentId, uris)
-            Toast.makeText(context, "Importing ${uris.size} image(s)...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Importing ${uris.size} images", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -217,7 +216,7 @@ fun ViewDocumentScreen(
                         .align(Alignment.BottomEnd)
                         .padding(end = 16.dp, bottom = 16.dp)
                 ) {
-                    Icon(Icons.Filled.AddPhotoAlternate, "Import Image")
+                    Icon(Icons.Filled.AddPhotoAlternate, "Import Prescription")
                 }
             }
         }
