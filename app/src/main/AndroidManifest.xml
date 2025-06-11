@@ -7,7 +7,8 @@
         android:maxSdkVersion="28" />
 
     <application
-        android:name=".MyPrescriptionApplication"  android:allowBackup="true"
+        android:name=".MyPrescriptionApplication"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/app_logo"

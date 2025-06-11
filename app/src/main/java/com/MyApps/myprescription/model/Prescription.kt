@@ -4,9 +4,11 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.myprescription.util.DateSerializer
 import java.util.Date
 import java.util.UUID
-
+import kotlinx.serialization.Serializable
+@Serializable
 @Entity(
     tableName = "prescriptions",
     foreignKeys = [ForeignKey(
@@ -22,6 +24,7 @@ data class Prescription(
     val memberId: String, // Foreign key to Member
     val doctorId: String?, // Foreign key to Doctor
     val doctorName: String,
+    @Serializable(with = DateSerializer::class)
     val date: Date = Date(), // Will use TypeConverter
     val notes: String? = null,
     val imageUri: String? = null // Will store path to internal file
