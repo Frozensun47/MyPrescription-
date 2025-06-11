@@ -11,11 +11,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import androidx.navigation.navigation
 import com.MyApps.myprescription.MyPrescriptionApplication
-import com.MyApps.myprescription.ui.screens.*
-import com.MyApps.myprescription.util.Prefs
 import com.MyApps.myprescription.ViewModel.AuthViewModel
 import com.MyApps.myprescription.ViewModel.FamilyViewModel
 import com.MyApps.myprescription.ViewModel.MemberDetailsViewModel
+import com.MyApps.myprescription.ui.screens.*
+import com.MyApps.myprescription.util.Prefs
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
@@ -140,8 +140,9 @@ fun AppNavHost(
         }
 
         composable(AppDestinations.SETTINGS_ROUTE) {
-            // This screen's code remains unchanged, but is included for completeness
             val authViewModel: AuthViewModel = viewModel()
+            // Get the FamilyViewModel instance to pass to the SettingsScreen
+            val familyViewModel: FamilyViewModel = viewModel(factory = FamilyViewModel.Factory)
             val firebaseUser by authViewModel.user.collectAsState()
             val currentUserId = firebaseUser?.uid
             val applicationScope = rememberCoroutineScope()
@@ -149,6 +150,7 @@ fun AppNavHost(
             if (currentUserId != null) {
                 SettingsScreen(
                     userId = currentUserId,
+                    familyViewModel = familyViewModel, // Pass the ViewModel here
                     onNavigateUp = { navController.navigateUp() },
                     onNavigateToChangePin = { navController.navigate(AppDestinations.PIN_SETUP_ROUTE) },
                     onLogout = {

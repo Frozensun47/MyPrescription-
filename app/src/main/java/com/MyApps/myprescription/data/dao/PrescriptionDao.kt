@@ -7,6 +7,12 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface PrescriptionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(prescriptions: List<Prescription>)
+
+    @Query("SELECT * FROM prescriptions")
+    fun getAll(): Flow<List<Prescription>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPrescription(prescription: Prescription)
 
     @Update

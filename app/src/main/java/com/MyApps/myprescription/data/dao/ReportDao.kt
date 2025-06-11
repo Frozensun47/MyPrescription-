@@ -7,6 +7,12 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ReportDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(reports: List<Report>)
+
+    @Query("SELECT * FROM reports")
+    fun getAll(): Flow<List<Report>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReport(report: Report)
 
     @Update

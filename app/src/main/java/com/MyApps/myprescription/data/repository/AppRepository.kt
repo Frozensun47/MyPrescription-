@@ -50,4 +50,14 @@ class AppRepository(
     }
 
     suspend fun getAllMembersOnce(): List<Member> = memberDao.getAllMembers().first()
+
+    suspend fun getAllDoctorsOnce(): List<Doctor> = doctorDao.getAll().first()
+    suspend fun getAllPrescriptionsOnce(): List<Prescription> = prescriptionDao.getAll().first()
+    suspend fun getAllReportsOnce(): List<Report> = reportDao.getAll().first()
+
+    suspend fun insertAllMembers(members: List<Member>) = memberDao.insertAll(members)
+    suspend fun insertAllDoctors(doctors: List<Doctor>) = doctorDao.insertAll(doctors)
+    suspend fun insertAllPrescriptions(prescriptions: List<Prescription>) = prescriptionDao.insertAll(prescriptions)
+    suspend fun insertAllReports(reports: List<Report>) = reportDao.insertAll(reports)
+
 }

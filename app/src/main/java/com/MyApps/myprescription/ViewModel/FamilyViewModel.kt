@@ -2,6 +2,7 @@ package com.MyApps.myprescription.ViewModel
 
 import android.app.Application
 import android.net.Uri
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -9,11 +10,17 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.MyApps.myprescription.MyPrescriptionApplication
 import com.MyApps.myprescription.data.repository.AppRepository
+import com.MyApps.myprescription.model.BackupData
 import com.MyApps.myprescription.model.Member
 import com.MyApps.myprescription.util.saveFileToInternalStorage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 class FamilyViewModel(application: Application, private val repository: AppRepository) : AndroidViewModel(application) {
 
@@ -21,7 +28,7 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     val members: StateFlow<List<Member>> = repository.getAllMembers()
-        .onEach { _isLoading.value = false } // Set loading to false after the first data emission
+        .onEach { _isLoading.value = false }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _showAddMemberDialog = MutableStateFlow(false)
@@ -30,6 +37,7 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
     private val _editingMember = MutableStateFlow<Member?>(null)
     val editingMember: StateFlow<Member?> = _editingMember.asStateFlow()
 
+    // --- Original Functions ---
     fun addMember(memberData: Member, profilePhotoUri: Uri?) {
         viewModelScope.launch {
             var finalMember = memberData
@@ -85,19 +93,99 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
         _editingMember.value = null
     }
 
+    // --- Backup and Restore Functions ---
+    fun exportBackup(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val members = repository.getAllMembers().first()
+                val doctors = repository.getAllDoctorsOnce()
+                val prescriptions = repository.getAllPrescriptionsOnce()
+                val reports = repository.getAllReportsOnce()
+
+                val backupData = BackupData(members, doctors, prescriptions, reports)
+                val jsonString = Json.encodeToString(BackupData.serializer(), backupData)
+
+                getApplication<Application>().contentResolver.openFileDescriptor(uri, "w")?.use { pfd ->
+                    ZipOutputStream(FileOutputStream(pfd.fileDescriptor)).use { zipOut ->
+                        zipOut.putNextEntry(java.util.zip.ZipEntry("backup_data.json"))
+                        zipOut.write(jsonString.toByteArray())
+                        zipOut.closeEntry()
+
+                        val allFilePaths = (
+                                prescriptions.flatMap { it.imageUri?.split(',') ?: emptyList() } +
+                                        reports.flatMap { it.fileUri?.split(',') ?: emptyList() } +
+                                        members.mapNotNull { it.profileImageUri }
+                                ).filter { it.isNotBlank() }.toSet()
+
+                        allFilePaths.forEach { path ->
+                            val file = File(path)
+                            if (file.exists()) {
+                                zipOut.putNextEntry(java.util.zip.ZipEntry("files/${file.name}"))
+                                file.inputStream().copyTo(zipOut)
+                                zipOut.closeEntry()
+                            }
+                        }
+                    }
+                }
+                launch(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Backup created successfully!", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                launch(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Backup failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    fun importBackup(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repository.clearAllDatabaseTables()
+
+                val filesDir = getApplication<Application>().filesDir
+                filesDir.listFiles()?.forEach { file -> if (file.isFile) file.delete() }
+
+                getApplication<Application>().contentResolver.openInputStream(uri)?.use { inputStream ->
+                    ZipInputStream(inputStream).use { zipIn ->
+                        var entry = zipIn.nextEntry
+                        while (entry != null) {
+                            if (entry.name == "backup_data.json") {
+                                val jsonString = zipIn.bufferedReader().use { it.readText() }
+                                val backupData = Json.decodeFromString(BackupData.serializer(), jsonString)
+
+                                repository.insertAllMembers(backupData.members)
+                                repository.insertAllDoctors(backupData.doctors)
+                                repository.insertAllPrescriptions(backupData.prescriptions)
+                                repository.insertAllReports(backupData.reports)
+
+                            } else if (entry.name.startsWith("files/")) {
+                                val file = File(filesDir, entry.name.substringAfter("files/"))
+                                FileOutputStream(file).use { fos -> zipIn.copyTo(fos) }
+                            }
+                            zipIn.closeEntry()
+                            entry = zipIn.nextEntry
+                        }
+                    }
+                }
+                launch(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Restore successful! Please restart the app.", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                launch(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Restore failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(
-                modelClass: Class<T>,
-                extras: CreationExtras
-            ): T {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) as MyPrescriptionApplication
-                val repository = application.repository ?: throw IllegalStateException("Repository not initialized, user must be logged in.")
-                return FamilyViewModel(
-                    application,
-                    repository
-                ) as T
+                val repository = application.repository ?: throw IllegalStateException("Repository not initialized")
+                return FamilyViewModel(application, repository) as T
             }
         }
     }
