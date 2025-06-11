@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.myprescription"
+    namespace = "com.MyApps.myprescription"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.myprescription"
+        applicationId = "com.MyApps.myprescription"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
