@@ -102,7 +102,7 @@ class MemberDetailsViewModel(application: Application, private val repository: A
                 doctorId = doctor.id,
                 doctorName = doctor.name,
                 date = Date(),
-                notes = "New prescription from ${SimpleDateFormat("dd MMM yy", Locale.getDefault()).format(Date())}",
+                notes = null,
                 imageUri = imagePaths.joinToString(",")
             )
             repository.insertPrescription(newPrescription)

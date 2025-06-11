@@ -27,7 +27,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // FIX: Enabled minification for security and smaller app size.
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -73,7 +74,8 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.android.gms:play-services-auth:21.2.0")
-    // ADD the new Credential Manager libraries
+
+    // FIX: ADD the new Credential Manager libraries
     implementation("androidx.credentials:credentials:1.2.2")
     implementation("androidx.credentials:credentials-play-services-auth:1.2.2")
     implementation("com.airbnb.android:lottie-compose:6.4.0")
@@ -90,7 +92,9 @@ dependencies {
     val roomVersion = "2.6.1" // Ensure this is the latest stable version
     implementation("androidx.room:room-runtime:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion") // KSP for Room's annotation processor
-    implementation("androidx.room:room-ktx:$roomVersion") // Kotlin Extensions and Coroutines support for Room
+
+    // FIX: Added Room KTX for Kotlin Extensions and Coroutines support
+    implementation("androidx.room:room-ktx:$roomVersion")
 
     // Android Core KTX
     implementation("androidx.core:core-ktx:1.13.1")

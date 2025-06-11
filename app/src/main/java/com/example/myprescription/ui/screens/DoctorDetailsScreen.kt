@@ -1,6 +1,7 @@
 package com.example.myprescription.ui.screens
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -15,9 +16,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.myprescription.ViewModel.MemberDetailsViewModel
+import com.example.myprescription.model.Doctor
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -29,6 +32,7 @@ fun DoctorDetailsScreen(
     onNavigateToViewDocument: (documentId: String, documentType: String, documentTitle: String) -> Unit,
     onNavigateUp: () -> Unit
 ) {
+    val context = LocalContext.current
     // --- STATE COLLECTION ---
     val prescriptions by memberDetailsViewModel.prescriptionsForSelectedDoctor.collectAsState()
     val reports by memberDetailsViewModel.reportsForSelectedDoctor.collectAsState()
@@ -38,10 +42,23 @@ fun DoctorDetailsScreen(
     val editingReport by memberDetailsViewModel.editingReport.collectAsState()
     val currentMemberId by memberDetailsViewModel.currentMemberId.collectAsState()
     val coroutineScope = rememberCoroutineScope()
+    // Find the current doctor object to pass to the ViewModel
+    val doctors by memberDetailsViewModel.doctors.collectAsState()
+    val currentDoctor = remember(doctors, doctorId) { doctors.find { it.id == doctorId } }
+
 
     // Load data for the specific doctor when the screen is shown
     LaunchedEffect(doctorId) {
         memberDetailsViewModel.selectDoctor(doctorId)
+    }
+
+    // Launcher for creating a new prescription silently
+    val quickPrescriptionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            memberDetailsViewModel.createPrescriptionWithAttachments(uris)
+        }
     }
 
     // Launchers for uploading files from within this screen
@@ -71,8 +88,15 @@ fun DoctorDetailsScreen(
             FloatingActionButton(
                 onClick = {
                     if (pagerState.currentPage == 0) {
-                        memberDetailsViewModel.onAddPrescriptionClicked(doctorId)
+                        // MODIFIED: Instead of showing a dialog, launch the image picker directly
+                        if (currentDoctor != null) {
+                            memberDetailsViewModel.targetDoctorForAttachment.value = currentDoctor
+                            quickPrescriptionLauncher.launch("image/*")
+                        } else {
+                            Toast.makeText(context, "Doctor details not found.", Toast.LENGTH_SHORT).show()
+                        }
                     } else {
+                        // Kept original behavior for reports, as not requested
                         memberDetailsViewModel.onAddReportClicked(doctorId)
                     }
                 },
