@@ -1,7 +1,13 @@
 package com.MyApps.myprescription.ui.screens
 
+import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.util.Log
+import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -132,8 +138,23 @@ fun ViewDocumentScreen(
                 },
                 actions = {
                     if (isInSelectionMode) {
-                        IconButton(onClick = { /* Share Logic */ }) { Icon(Icons.Default.Share, "Share") }
-                        IconButton(onClick = { /* Download Logic */ }) { Icon(Icons.Default.Download, "Download") }
+                        IconButton(onClick = {
+                            val authority = "${context.packageName}.provider"
+                            val uris = selectedFilePaths.map {
+                                FileProvider.getUriForFile(context, authority, File(it))
+                            } as ArrayList<Uri>
+
+                            val shareIntent = Intent().apply {
+                                action = Intent.ACTION_SEND_MULTIPLE
+                                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                                type = "*/*"
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share files..."))
+                        }) { Icon(Icons.Default.Share, "Share") }
+                        IconButton(onClick = {
+                            saveFilesToMediaStore(context, selectedFilePaths, documentType)
+                            selectedFilePaths = emptySet() // Clear selection after download
+                        }) { Icon(Icons.Default.Download, "Download") }
                         IconButton(onClick = { showDeleteConfirmation = true }) { Icon(Icons.Default.Delete, "Delete") }
                     }
                 }
@@ -257,6 +278,84 @@ fun ViewDocumentScreen(
         )
     }
 }
+
+private fun saveFilesToMediaStore(
+    context: android.content.Context,
+    filePaths: Set<String>,
+    documentType: String
+) {
+    val contentResolver = context.contentResolver
+    var filesSaved = 0
+
+    for (path in filePaths) {
+        try {
+            val sourceFile = File(path)
+            if (!sourceFile.exists()) continue
+
+            val collection: Uri
+            val relativePath: String
+
+            if (documentType == "prescription") {
+                collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                } else {
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                }
+                relativePath = Environment.DIRECTORY_PICTURES + File.separator + "MyPrescription"
+            } else {
+                collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                } else {
+                    // Fallback for older APIs, though Downloads directory is less standard pre-Q
+                    // This will save to the root of the external storage in a Downloads folder
+                    Uri.parse(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).path)
+                }
+                relativePath = Environment.DIRECTORY_DOWNLOADS
+            }
+
+            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(sourceFile.extension) ?: "*/*"
+
+            val contentValues = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, sourceFile.name)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+            }
+
+            val uri = contentResolver.insert(collection, contentValues)
+
+            uri?.let {
+                contentResolver.openOutputStream(it).use { outputStream ->
+                    sourceFile.inputStream().use { inputStream ->
+                        inputStream.copyTo(outputStream!!)
+                    }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    contentValues.clear()
+                    contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                    contentResolver.update(it, contentValues, null, null)
+                }
+                filesSaved++
+            }
+        } catch (e: Exception) {
+            Log.e("ViewDocumentScreen", "Failed to save file: $path", e)
+        }
+    }
+
+    if (filesSaved > 0) {
+        val message = if (filesSaved == filePaths.size) {
+            "Saved $filesSaved file(s) successfully."
+        } else {
+            "Saved $filesSaved out of ${filePaths.size} file(s)."
+        }
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    } else {
+        Toast.makeText(context, "Failed to save files.", Toast.LENGTH_SHORT).show()
+    }
+}
+
 
 private fun openFile(context: android.content.Context, filePath: String) {
     val file = File(filePath)
