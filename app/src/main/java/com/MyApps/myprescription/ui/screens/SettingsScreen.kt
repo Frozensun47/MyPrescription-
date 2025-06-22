@@ -5,10 +5,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,6 +33,10 @@ fun SettingsScreen(
     familyViewModel: FamilyViewModel,
     onNavigateUp: () -> Unit,
     onNavigateToChangePin: () -> Unit,
+    onNavigateToAbout: () -> Unit,
+    onNavigateToHelp: () -> Unit,
+    onNavigateToTerms: () -> Unit,
+    onNavigateToPrivacyPolicy: () -> Unit,
     onLogout: () -> Unit,
     onDeleteAccount: () -> Unit
 ) {
@@ -65,9 +70,13 @@ fun SettingsScreen(
             )
         }
     ) { paddingValues ->
-        Surface(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                SettingsSectionTitle("Security")
+        LazyColumn(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+        ) {
+            item { SettingsSectionTitle("Security") }
+            item {
                 SettingsItem(
                     title = "Enable PIN Lock",
                     subtitle = if (isPinEnabled) "PIN is enabled" else "PIN is disabled",
@@ -77,26 +86,32 @@ fun SettingsScreen(
                         Switch(
                             checked = isPinEnabled,
                             onCheckedChange = { newState ->
-                                if (!newState) {
+                                if (newState) {
+                                    onNavigateToChangePin()
+                                } else {
+                                    // You might want to verify PIN before disabling
                                     prefs.setPinEnabled(userId, false)
                                     isPinEnabled = false
-                                } else {
-                                    onNavigateToChangePin()
                                 }
                             }
                         )
                     }
                 )
+            }
+            item {
                 SettingsItem(
                     title = "Change PIN",
                     icon = Icons.Default.Key,
                     enabled = isPinEnabled,
-                    onClick = { if (isPinEnabled) showVerifyPinDialog = true else onNavigateToChangePin() }
+                    onClick = { if (isPinEnabled) showVerifyPinDialog = true else onNavigateToChangePin() },
+                    isNavigation = true
                 )
+            }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp))
+            item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)) }
 
-                SettingsSectionTitle("Data Management")
+            item { SettingsSectionTitle("Data Management") }
+            item {
                 SettingsItem(
                     title = "Backup Data",
                     subtitle = "Save all data to a local .zip file",
@@ -106,17 +121,39 @@ fun SettingsScreen(
                         backupLauncher.launch("MyPrescription_Backup_$timestamp.zip")
                     }
                 )
+            }
+            item {
                 SettingsItem(
                     title = "Restore Data",
                     subtitle = "Restore data from a backup file",
                     icon = Icons.Default.CloudDownload,
                     onClick = { restoreLauncher.launch("*/*") }
                 )
+            }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp))
+            item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)) }
 
-                SettingsSectionTitle("Account")
+            item { SettingsSectionTitle("Information") }
+            item {
+                SettingsItem(title = "About", icon = Icons.Default.Info, onClick = onNavigateToAbout, isNavigation = true)
+            }
+            item {
+                SettingsItem(title = "Help", icon = Icons.AutoMirrored.Filled.Help, onClick = onNavigateToHelp, isNavigation = true)
+            }
+            item {
+                SettingsItem(title = "Terms & Conditions", icon = Icons.AutoMirrored.Filled.Article, onClick = onNavigateToTerms, isNavigation = true)
+            }
+            item {
+                SettingsItem(title = "Privacy Policy", icon = Icons.Default.Policy, onClick = onNavigateToPrivacyPolicy, isNavigation = true)
+            }
+
+            item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)) }
+
+            item { SettingsSectionTitle("Account") }
+            item {
                 SettingsItem(title = "Logout", icon = Icons.AutoMirrored.Filled.Logout, onClick = onLogout)
+            }
+            item {
                 SettingsItem(
                     title = "Delete Account",
                     subtitle = "This action is permanent",
@@ -128,12 +165,29 @@ fun SettingsScreen(
         }
     }
 
-    if (showDeleteDialog) { /* ... unchanged ... */ }
-    if (showVerifyPinDialog) { /* ... unchanged ... */ }
+    if (showDeleteDialog) {
+        DeleteAccountConfirmationDialog(
+            onDismiss = { showDeleteDialog = false },
+            onConfirm = {
+                showDeleteDialog = false
+                onDeleteAccount()
+            }
+        )
+    }
+    if (showVerifyPinDialog) {
+        val correctPin = prefs.getPin(userId) ?: ""
+        VerifyPinDialog(
+            onDismiss = { showVerifyPinDialog = false },
+            onConfirm = {
+                showVerifyPinDialog = false
+                onNavigateToChangePin()
+            },
+            correctPin = correctPin
+        )
+    }
 }
 
 
-// --- The other composables in this file (SettingsItem, etc.) remain unchanged ---
 @Composable
 private fun SettingsSectionTitle(title: String) {
     Text(
@@ -141,7 +195,9 @@ private fun SettingsSectionTitle(title: String) {
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp)
     )
 }
 
@@ -152,6 +208,7 @@ private fun SettingsItem(
     icon: ImageVector,
     enabled: Boolean = true,
     isDestructive: Boolean = false,
+    isNavigation: Boolean = false,
     onClick: () -> Unit,
     trailingContent: (@Composable () -> Unit)? = null
 ) {
@@ -195,6 +252,12 @@ private fun SettingsItem(
             Box(modifier = Modifier.align(Alignment.CenterVertically)) {
                 trailingContent()
             }
+        } else if (isNavigation) {
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f)
+            )
         }
     }
 }

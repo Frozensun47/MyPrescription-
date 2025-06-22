@@ -18,7 +18,9 @@ import com.MyApps.myprescription.ui.screens.*
 import com.MyApps.myprescription.util.Prefs
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -35,6 +37,8 @@ object AppDestinations {
     const val SETTINGS_ROUTE = "settings"
     const val ABOUT_ROUTE = "about"
     const val HELP_ROUTE = "help"
+    const val TERMS_AND_CONDITIONS_ROUTE = "terms_and_conditions"
+    const val PRIVACY_POLICY_ROUTE = "privacy_policy"
 
     const val MEMBER_ID_ARG = "memberId"
     const val MEMBER_NAME_ARG = "memberName"
@@ -56,6 +60,7 @@ fun AppNavHost(
     val context = LocalContext.current
     val application = context.applicationContext as MyPrescriptionApplication
     val prefs = remember { Prefs(context) }
+    val coroutineScope = rememberCoroutineScope()
 
     val startDestination = remember {
         val currentUser = Firebase.auth.currentUser
@@ -83,6 +88,9 @@ fun AppNavHost(
                         val nextRoute = if (prefs.getPin(loggedInUser.uid) == null) AppDestinations.PIN_SETUP_ROUTE else AppDestinations.PIN_ENTRY_ROUTE
                         navController.navigate(nextRoute) { popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true } }
                     }
+                },
+                onNavigateToTerms = {
+                    navController.navigate(AppDestinations.TERMS_AND_CONDITIONS_ROUTE)
                 }
             )
         }
@@ -141,34 +149,42 @@ fun AppNavHost(
 
         composable(AppDestinations.SETTINGS_ROUTE) {
             val authViewModel: AuthViewModel = viewModel()
-            // Get the FamilyViewModel instance to pass to the SettingsScreen
             val familyViewModel: FamilyViewModel = viewModel(factory = FamilyViewModel.Factory)
             val firebaseUser by authViewModel.user.collectAsState()
             val currentUserId = firebaseUser?.uid
-            val applicationScope = rememberCoroutineScope()
 
             if (currentUserId != null) {
                 SettingsScreen(
                     userId = currentUserId,
-                    familyViewModel = familyViewModel, // Pass the ViewModel here
+                    familyViewModel = familyViewModel,
                     onNavigateUp = { navController.navigateUp() },
                     onNavigateToChangePin = { navController.navigate(AppDestinations.PIN_SETUP_ROUTE) },
+                    onNavigateToAbout = { navController.navigate(AppDestinations.ABOUT_ROUTE) },
+                    onNavigateToHelp = { navController.navigate(AppDestinations.HELP_ROUTE) },
+                    onNavigateToTerms = { navController.navigate(AppDestinations.TERMS_AND_CONDITIONS_ROUTE) },
+                    onNavigateToPrivacyPolicy = { navController.navigate(AppDestinations.PRIVACY_POLICY_ROUTE) },
                     onLogout = {
                         authViewModel.logout()
                         application.onUserLogout()
                         navController.navigate(AppDestinations.LOGIN_ROUTE) { popUpTo(navController.graph.startDestinationId) { inclusive = true } }
                     },
                     onDeleteAccount = {
-                        applicationScope.launch {
+                        coroutineScope.launch {
                             val userToDelete = Firebase.auth.currentUser
                             if (userToDelete != null && userToDelete.uid == currentUserId) {
-                                application.repository?.clearAllDatabaseTables()
+                                withContext(Dispatchers.IO) {
+                                    application.repository?.clearAllDatabaseTables()
+                                }
                                 prefs.clearAllData()
                                 userToDelete.delete().addOnCompleteListener { task ->
                                     if (task.isSuccessful) {
                                         authViewModel.logout()
                                         application.onUserLogout()
-                                        navController.navigate(AppDestinations.LOGIN_ROUTE) { popUpTo(navController.graph.startDestinationId) { inclusive = true } }
+                                        coroutineScope.launch(Dispatchers.Main) {
+                                            navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -182,8 +198,20 @@ fun AppNavHost(
             }
         }
 
-        composable(AppDestinations.ABOUT_ROUTE) { AboutScreen(onNavigateUp = { navController.navigateUp() }) }
+        composable(AppDestinations.ABOUT_ROUTE) {
+            AboutScreen(
+                onNavigateUp = { navController.navigateUp() },
+                onNavigateToTerms = { navController.navigate(AppDestinations.TERMS_AND_CONDITIONS_ROUTE) },
+                onNavigateToPrivacyPolicy = { navController.navigate(AppDestinations.PRIVACY_POLICY_ROUTE) }
+            )
+        }
         composable(AppDestinations.HELP_ROUTE) { HelpScreen(onNavigateUp = { navController.navigateUp() }) }
+        composable(AppDestinations.TERMS_AND_CONDITIONS_ROUTE) {
+            TermsAndConditionsScreen(onNavigateUp = { navController.navigateUp() })
+        }
+        composable(AppDestinations.PRIVACY_POLICY_ROUTE) {
+            PrivacyPolicyScreen(onNavigateUp = { navController.navigateUp() })
+        }
 
         navigation(
             route = "${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}",

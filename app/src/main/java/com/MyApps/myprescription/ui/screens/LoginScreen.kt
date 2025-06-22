@@ -38,6 +38,7 @@ import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.MyApps.myprescription.R
 import com.MyApps.myprescription.ViewModel.AuthViewModel
+import com.MyApps.myprescription.navigation.AppDestinations
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.GoogleAuthProvider
@@ -48,7 +49,8 @@ import kotlinx.coroutines.delay
 @Composable
 fun LoginScreen(
     authViewModel: AuthViewModel = viewModel(),
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    onNavigateToTerms: () -> Unit
 ) {
     val context = LocalContext.current
     var isLoading by remember { mutableStateOf(false) }
@@ -179,7 +181,8 @@ fun LoginScreen(
 
                 TermsAndConditionsCheckbox(
                     checked = termsAccepted,
-                    onCheckedChange = onTermsAcceptedChange
+                    onCheckedChange = onTermsAcceptedChange,
+                    onNavigateToTerms = onNavigateToTerms
                 )
 
                 Spacer(modifier = Modifier.height(25.dp))
@@ -211,7 +214,8 @@ fun LoginScreen(
 @Composable
 private fun TermsAndConditionsCheckbox(
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    onNavigateToTerms: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
     val annotatedString = buildAnnotatedString {
@@ -246,7 +250,7 @@ private fun TermsAndConditionsCheckbox(
             style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
             onClick = { offset ->
                 annotatedString.getStringAnnotations(tag = "TERMS", start = offset, end = offset)
-                    .firstOrNull()?.let { uriHandler.openUri(it.item) }
+                    .firstOrNull()?.let { onNavigateToTerms() }
                 annotatedString.getStringAnnotations(tag = "PRIVACY", start = offset, end = offset)
                     .firstOrNull()?.let { uriHandler.openUri(it.item) }
             }
