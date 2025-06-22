@@ -2,6 +2,7 @@ package com.MyApps.myprescription.ViewModel
 
 import android.app.Application
 import android.net.Uri
+import android.util.Log // Added for logging security alerts
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
@@ -141,14 +142,17 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
     fun importBackup(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // Clear existing data before import (aggressive, but consistent with current design)
                 repository.clearAllDatabaseTables()
+                getApplication<Application>().filesDir.listFiles()?.forEach { file -> if (file.isFile) file.delete() }
 
-                val filesDir = getApplication<Application>().filesDir
-                filesDir.listFiles()?.forEach { file -> if (file.isFile) file.delete() }
 
                 getApplication<Application>().contentResolver.openInputStream(uri)?.use { inputStream ->
                     ZipInputStream(inputStream).use { zipIn ->
                         var entry = zipIn.nextEntry
+                        val filesDir = getApplication<Application>().filesDir
+                        val canonicalFilesDir = filesDir.canonicalPath + File.separator // Ensure trailing separator
+
                         while (entry != null) {
                             if (entry.name == "backup_data.json") {
                                 val jsonString = zipIn.bufferedReader().use { it.readText() }
@@ -160,8 +164,23 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
                                 repository.insertAllReports(backupData.reports)
 
                             } else if (entry.name.startsWith("files/")) {
-                                val file = File(filesDir, entry.name.substringAfter("files/"))
-                                FileOutputStream(file).use { fos -> zipIn.copyTo(fos) }
+                                val entryName = entry.name.substringAfter("files/")
+                                val targetFile = File(filesDir, entryName)
+
+                                // CRITICAL: Validate that the canonical path of the target file is still within the app's files directory.
+                                val canonicalFilePath = targetFile.canonicalPath
+
+                                if (!canonicalFilePath.startsWith(canonicalFilesDir)) {
+                                    Log.w("FamilyViewModel", "Security Alert: Attempted directory traversal detected. Skipping file: ${entry.name}")
+                                    entry = zipIn.nextEntry
+                                    continue // Skip this potentially malicious entry
+                                }
+
+                                // Create parent directories if they don't exist (important for sub-folders)
+                                targetFile.parentFile?.mkdirs()
+
+                                // If the path is valid, proceed with copying the file
+                                FileOutputStream(targetFile).use { fos -> zipIn.copyTo(fos) }
                             }
                             zipIn.closeEntry()
                             entry = zipIn.nextEntry
@@ -174,6 +193,7 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
             } catch (e: Exception) {
                 launch(Dispatchers.Main) {
                     Toast.makeText(getApplication(), "Restore failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    Log.e("FamilyViewModel", "Restore error", e) // Log the full exception for debugging
                 }
             }
         }

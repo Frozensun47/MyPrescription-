@@ -1,3 +1,4 @@
+// frozensun47/myprescription-/MyPrescription--81e5414b6e706cfd87c9dd01262402647362da55/app/src/main/java/com/MyApps/myprescription/ui/screens/AboutScreen.kt
 package com.MyApps.myprescription.ui.screens
 
 import androidx.compose.foundation.Image
@@ -70,7 +71,7 @@ fun AboutScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Version 1.0",
+                    text = "Version 22.06.25",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -94,7 +95,7 @@ fun AboutScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)) // Updated alpha
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         InfoRow(

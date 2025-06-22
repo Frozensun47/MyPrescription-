@@ -1,3 +1,4 @@
+// frozensun47/myprescription-/MyPrescription--81e5414b6e706cfd87c9dd01262402647362da55/app/src/main/java/com/MyApps/myprescription/ui/screens/TutorialScreen.kt
 package com.MyApps.myprescription.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
@@ -75,7 +76,7 @@ fun TutorialScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(0.dp)
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp) // Updated
                 )
             )
         },

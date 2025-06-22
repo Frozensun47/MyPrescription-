@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Settings
@@ -31,7 +32,8 @@ fun AppMenuTray(
     onChangeAccountClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onHelpClick: () -> Unit,
-    onAboutClick: () -> Unit
+    onAboutClick: () -> Unit,
+    onFeedbackClick: () -> Unit
 ) {
     ModalDrawerSheet {
         Column(
@@ -96,6 +98,13 @@ fun AppMenuTray(
                     selected = false,
                     onClick = onSettingsClick,
                     icon = { Icon(Icons.Outlined.Settings, contentDescription = "Settings") },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Contact & Feedback") },
+                    selected = false,
+                    onClick = onFeedbackClick,
+                    icon = { Icon(Icons.Outlined.Email, contentDescription = "Feedback") },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
                 NavigationDrawerItem(

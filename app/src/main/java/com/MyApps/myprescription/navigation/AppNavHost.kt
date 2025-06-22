@@ -111,9 +111,14 @@ fun AppNavHost(
                 onPinSet = { pin ->
                     Firebase.auth.currentUser?.uid?.let { userId ->
                         prefs.setPin(userId, pin)
-                        // After setting a PIN for the first time, go to the tutorial
-                        navController.navigate(AppDestinations.TUTORIAL_ROUTE) {
-                            popUpTo(AppDestinations.PIN_SETUP_ROUTE) { inclusive = true }
+                        // If the tutorial has already been seen (i.e., changing pin from settings),
+                        // just go back. Otherwise, go to the tutorial.
+                        if (prefs.hasSeenTutorial(userId)) {
+                            navController.popBackStack()
+                        } else {
+                            navController.navigate(AppDestinations.TUTORIAL_ROUTE) {
+                                popUpTo(AppDestinations.PIN_SETUP_ROUTE) { inclusive = true }
+                            }
                         }
                     }
                 },

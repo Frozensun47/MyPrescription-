@@ -1,5 +1,6 @@
 package com.MyApps.myprescription.ui.screens
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -67,6 +68,7 @@ fun FamilyMembersScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val user by authViewModel.user.collectAsState()
+    val context = LocalContext.current
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -80,6 +82,14 @@ fun FamilyMembersScreen(
                 onSettingsClick = {
                     scope.launch { drawerState.close() }
                     onNavigateToSettings()
+                },
+                onFeedbackClick = {
+                    scope.launch { drawerState.close() }
+                    val subject = "MyPrescription Feedback: "
+                    val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
+                        data = Uri.parse("mailto:feedback@myapplications.store?subject=${Uri.encode(subject)}")
+                    }
+                    context.startActivity(Intent.createChooser(emailIntent, "Send feedback"))
                 },
                 onHelpClick = {
                     scope.launch { drawerState.close() }

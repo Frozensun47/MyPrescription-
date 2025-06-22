@@ -1,3 +1,4 @@
+// frozensun47/myprescription-/MyPrescription--81e5414b6e706cfd87c9dd01262402647362da55/app/src/main/java/com/MyApps/myprescription/ui/screens/ViewDocumentScreen.kt
 package com.MyApps.myprescription.ui.screens
 
 import android.content.ContentValues
@@ -157,7 +158,10 @@ fun ViewDocumentScreen(
                         }) { Icon(Icons.Default.Download, "Download") }
                         IconButton(onClick = { showDeleteConfirmation = true }) { Icon(Icons.Default.Delete, "Delete") }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors( // Added
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
+                )
             )
         }
     ) { paddingValues ->
@@ -235,7 +239,9 @@ fun ViewDocumentScreen(
                     onClick = { importImageLauncher.launch("image/*") },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp)
+                        .padding(end = 16.dp, bottom = 16.dp),
+                    containerColor = MaterialTheme.colorScheme.primary, // Added
+                    contentColor = MaterialTheme.colorScheme.onPrimary // Added
                 ) {
                     Icon(Icons.Filled.AddPhotoAlternate, "Import Prescription")
                 }

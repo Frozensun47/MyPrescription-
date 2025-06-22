@@ -1,3 +1,4 @@
+// frozensun47/myprescription-/MyPrescription--81e5414b6e706cfd87c9dd01262402647362da55/app/src/main/java/com/MyApps/myprescription/ui/screens/MemberDetailsScreen.kt
 package com.MyApps.myprescription.ui.screens
 
 import android.net.Uri
@@ -299,7 +300,7 @@ fun DoctorCard(
             .fillMaxWidth()
             .clickable(onClick = onCardClick),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)) // Updated alpha
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -346,7 +347,7 @@ fun PrescriptionCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = { if (imagePaths.isNotEmpty()) onViewClick(prescription) },
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)) // Updated alpha
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -430,7 +431,7 @@ fun ReportCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = { if (filePaths.isNotEmpty()) onViewClick(report) },
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)) // Updated alpha
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

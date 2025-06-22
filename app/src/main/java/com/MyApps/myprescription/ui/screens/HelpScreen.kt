@@ -1,3 +1,4 @@
+// frozensun47/myprescription-/MyPrescription--81e5414b6e706cfd87c9dd01262402647362da55/app/src/main/java/com/MyApps/myprescription/ui/screens/HelpScreen.kt
 package com.MyApps.myprescription.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
@@ -74,8 +75,7 @@ private fun FaqItem(question: String, answer: String) {
         onClick = { isExpanded = !isExpanded },
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)), // Updated alpha
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
