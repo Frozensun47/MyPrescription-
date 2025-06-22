@@ -44,13 +44,18 @@ fun DoctorDetailsScreen(
     // Find the current doctor object to pass to the ViewModel
     val doctors by memberDetailsViewModel.doctors.collectAsState()
     val currentDoctor = remember(doctors, doctorId) { doctors.find { it.id == doctorId } }
-
+    var isNavigatingBack by remember { mutableStateOf(false) } // Add this line
 
     // Load data for the specific doctor when the screen is shown
     LaunchedEffect(doctorId) {
         memberDetailsViewModel.selectDoctor(doctorId)
     }
-
+    val handleBackNavigation = { // Add this block
+        if (!isNavigatingBack) {
+            isNavigatingBack = true
+            onNavigateUp()
+        }
+    }
     // Launcher for creating a new prescription silently
     val quickPrescriptionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
@@ -79,7 +84,7 @@ fun DoctorDetailsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Dr. $doctorName") },
-                navigationIcon = { IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = handleBackNavigation) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }, // Modify this line
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp))
             )
         },

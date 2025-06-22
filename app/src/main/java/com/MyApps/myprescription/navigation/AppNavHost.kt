@@ -256,7 +256,10 @@ fun AppNavHost(
             startDestination = AppDestinations.MEMBER_DETAILS_ROUTE
         ) {
             composable(route = AppDestinations.MEMBER_DETAILS_ROUTE) { backStackEntry ->
-                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}") }
+                // FIX: Get the ViewModelStoreOwner from the navigation graph's back stack entry
+                val parentEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry(backStackEntry.destination.parent!!.route!!)
+                }
                 val memberDetailsViewModel: MemberDetailsViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = MemberDetailsViewModel.Factory)
                 val memberId = parentEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)
                 val memberName = parentEntry.arguments?.getString(AppDestinations.MEMBER_NAME_ARG)
@@ -285,7 +288,10 @@ fun AppNavHost(
                     navArgument(AppDestinations.DOCUMENT_TITLE_ARG) { type = NavType.StringType }
                 )
             ) { backStackEntry ->
-                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}") }
+                // FIX: Get the ViewModelStoreOwner from the navigation graph's back stack entry
+                val parentEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry(backStackEntry.destination.parent!!.route!!)
+                }
                 val memberDetailsViewModel: MemberDetailsViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = MemberDetailsViewModel.Factory)
                 val documentId = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_ID_ARG)
                 val documentType = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_TYPE_ARG)
@@ -309,7 +315,10 @@ fun AppNavHost(
                     navArgument(AppDestinations.DOCTOR_NAME_ARG) { type = NavType.StringType }
                 )
             ) { backStackEntry ->
-                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}") }
+                // FIX: Get the ViewModelStoreOwner from the navigation graph's back stack entry
+                val parentEntry = remember(backStackEntry) {
+                    navController.getBackStackEntry(backStackEntry.destination.parent!!.route!!)
+                }
                 val memberDetailsViewModel: MemberDetailsViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = MemberDetailsViewModel.Factory)
                 val doctorId = backStackEntry.arguments?.getString(AppDestinations.DOCTOR_ID_ARG)
                 val doctorName = backStackEntry.arguments?.getString(AppDestinations.DOCTOR_NAME_ARG)?.decodeUri()
