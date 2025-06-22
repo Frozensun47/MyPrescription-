@@ -2,6 +2,7 @@
 package com.MyApps.myprescription.ui.screens
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -62,6 +63,25 @@ fun MemberDetailsScreen(
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
 
+    // --- MODIFICATION START ---
+    // This state flag prevents multiple navigation events from being triggered.
+    var isNavigatingBack by remember { mutableStateOf(false) }
+
+    // This function will be called for all back navigation actions.
+    val handleBackNavigation = {
+        if (!isNavigatingBack) {
+            isNavigatingBack = true
+            onNavigateUp()
+        }
+    }
+
+    // Use the handler for the system back button.
+    BackHandler {
+        handleBackNavigation()
+    }
+    // --- MODIFICATION END ---
+
+
     val quickPrescriptionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
@@ -86,7 +106,8 @@ fun MemberDetailsScreen(
         topBar = {
             TopAppBar(
                 title = { Text(memberName) },
-                navigationIcon = { IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                // Use the new handler for the top app bar icon as well.
+                navigationIcon = { IconButton(onClick = handleBackNavigation) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp))
             )
         },

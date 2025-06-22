@@ -2,6 +2,7 @@ package com.MyApps.myprescription.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -69,6 +70,15 @@ fun FamilyMembersScreen(
     val scope = rememberCoroutineScope()
     val user by authViewModel.user.collectAsState()
     val context = LocalContext.current
+
+    // ADDED BackHandler
+    if (drawerState.isOpen) {
+        BackHandler {
+            scope.launch {
+                drawerState.close()
+            }
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,

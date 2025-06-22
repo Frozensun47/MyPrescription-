@@ -30,7 +30,7 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
 
     val members: StateFlow<List<Member>> = repository.getAllMembers()
         .onEach { _isLoading.value = false }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList()) // MODIFIED LINE
 
     private val _showAddMemberDialog = MutableStateFlow(false)
     val showAddMemberDialog: StateFlow<Boolean> = _showAddMemberDialog.asStateFlow()
