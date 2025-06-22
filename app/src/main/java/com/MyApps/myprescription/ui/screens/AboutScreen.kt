@@ -55,7 +55,7 @@ fun AboutScreen(
         ) {
             item {
                 Image(
-                    painter = painterResource(id = R.mipmap.my_prescription_foreground),
+                    painter = painterResource(id = R.mipmap.app_logo_foreground),
                     contentDescription = "App Logo",
                     modifier = Modifier.size(150.dp),
                     colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)

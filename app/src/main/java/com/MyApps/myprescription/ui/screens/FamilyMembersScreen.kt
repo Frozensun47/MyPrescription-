@@ -432,7 +432,7 @@ fun EmptyState() {
         verticalArrangement = Arrangement.Center
     ) {
         Image(
-            painter = painterResource(id = R.mipmap.my_prescription_foreground),
+            painter = painterResource(id = R.mipmap.app_logo_foreground),
             contentDescription = "Empty State Illustration",
             modifier = Modifier.size(150.dp),
             colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)

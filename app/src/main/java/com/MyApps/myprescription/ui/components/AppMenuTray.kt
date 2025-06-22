@@ -88,11 +88,10 @@ fun AppMenuTray(
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(8.dp)
-            ) {
+            // This spacer will push all the items below it to the bottom.
+            Spacer(Modifier.weight(1f))
+
+            Column(modifier = Modifier.padding(8.dp)) {
                 NavigationDrawerItem(
                     label = { Text("Settings") },
                     selected = false,
@@ -121,10 +120,7 @@ fun AppMenuTray(
                     icon = { Icon(Icons.Outlined.Info, contentDescription = "About") },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
-            }
-
-            Column(modifier = Modifier.padding(8.dp)) {
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
                 NavigationDrawerItem(
                     label = { Text("Logout & Switch Account") },
                     selected = false,

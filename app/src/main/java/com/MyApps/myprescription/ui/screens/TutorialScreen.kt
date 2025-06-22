@@ -43,22 +43,22 @@ fun TutorialScreen(
         TutorialPage(
             "Welcome to MyPrescription!",
             "Securely store and manage medical records for you and your family, all in one place, right on your device.",
-            R.mipmap.my_prescription_foreground
+            R.mipmap.app_logo_foreground
         ),
         TutorialPage(
             "Add Family Members",
             "Tap the '+' button on the main screen to create a profile for each family member. All their records will be neatly organized under their name.",
-            R.mipmap.my_prescription_foreground
+            R.mipmap.app_logo_foreground
         ),
         TutorialPage(
             "Manage Prescriptions & Reports",
             "Inside a member's profile, easily add prescriptions and health reports. Upload photos or files to keep everything together.",
-            R.mipmap.my_prescription_foreground
+            R.mipmap.app_logo_foreground
         ),
         TutorialPage(
             "Backup & Restore Your Data",
             "Your data is precious. Use the 'Backup' feature in Settings to save a copy of all your records. You can restore it anytime on any device.",
-            R.mipmap.my_prescription_foreground
+            R.mipmap.app_logo_foreground
         )
     )
 
