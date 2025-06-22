@@ -15,6 +15,16 @@ class Prefs(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
+    // --- Add these new functions ---
+    fun hasSeenTutorial(userId: String): Boolean {
+        return sharedPreferences.getBoolean("TUTORIAL_SEEN_$userId", false)
+    }
+
+    fun setTutorialSeen(userId: String) {
+        sharedPreferences.edit().putBoolean("TUTORIAL_SEEN_$userId", true).apply()
+    }
+    // -----------------------------
+
     // Functions now take userId to store PINs per-account
     fun getPin(userId: String): String? {
         return sharedPreferences.getString("USER_PIN_$userId", null)

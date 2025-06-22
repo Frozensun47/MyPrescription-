@@ -29,6 +29,7 @@ object AppDestinations {
     const val LOGIN_ROUTE = "login"
     const val PIN_SETUP_ROUTE = "pin_setup"
     const val PIN_ENTRY_ROUTE = "pin_entry"
+    const val TUTORIAL_ROUTE = "tutorial"
     const val FAMILY_MEMBERS_ROUTE = "family_members"
     const val MEMBER_DETAILS_FLOW_ROUTE = "member_details_flow"
     const val MEMBER_DETAILS_ROUTE = "member_details"
@@ -66,7 +67,11 @@ fun AppNavHost(
         val currentUser = Firebase.auth.currentUser
         if (currentUser != null) {
             application.initializeDependenciesForUser(currentUser.uid)
-            if (prefs.getPin(currentUser.uid) == null) AppDestinations.PIN_SETUP_ROUTE else AppDestinations.PIN_ENTRY_ROUTE
+            if (prefs.getPin(currentUser.uid) == null) {
+                AppDestinations.PIN_SETUP_ROUTE
+            } else {
+                AppDestinations.PIN_ENTRY_ROUTE
+            }
         } else {
             AppDestinations.LOGIN_ROUTE
         }
@@ -85,7 +90,11 @@ fun AppNavHost(
                     val loggedInUser = Firebase.auth.currentUser
                     if (loggedInUser != null) {
                         application.initializeDependenciesForUser(loggedInUser.uid)
-                        val nextRoute = if (prefs.getPin(loggedInUser.uid) == null) AppDestinations.PIN_SETUP_ROUTE else AppDestinations.PIN_ENTRY_ROUTE
+                        val nextRoute = if (prefs.getPin(loggedInUser.uid) == null) {
+                            AppDestinations.PIN_SETUP_ROUTE
+                        } else {
+                            AppDestinations.PIN_ENTRY_ROUTE
+                        }
                         navController.navigate(nextRoute) { popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true } }
                     }
                 },
@@ -102,7 +111,10 @@ fun AppNavHost(
                 onPinSet = { pin ->
                     Firebase.auth.currentUser?.uid?.let { userId ->
                         prefs.setPin(userId, pin)
-                        navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) { popUpTo(navController.graph.id) { inclusive = true } }
+                        // After setting a PIN for the first time, go to the tutorial
+                        navController.navigate(AppDestinations.TUTORIAL_ROUTE) {
+                            popUpTo(AppDestinations.PIN_SETUP_ROUTE) { inclusive = true }
+                        }
                     }
                 },
                 onPinEntered = {}
@@ -118,10 +130,31 @@ fun AppNavHost(
                 onPinEntered = { pin ->
                     Firebase.auth.currentUser?.uid?.let { userId ->
                         if (pin == prefs.getPin(userId)) {
-                            navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) { popUpTo(AppDestinations.PIN_ENTRY_ROUTE) { inclusive = true } }
+                            // After correct PIN entry, check if the tutorial has been seen
+                            val nextRoute = if (!prefs.hasSeenTutorial(userId)) {
+                                AppDestinations.TUTORIAL_ROUTE
+                            } else {
+                                AppDestinations.FAMILY_MEMBERS_ROUTE
+                            }
+                            navController.navigate(nextRoute) {
+                                popUpTo(AppDestinations.PIN_ENTRY_ROUTE) { inclusive = true }
+                            }
                         } else {
                             error = "Incorrect PIN"
                         }
+                    }
+                }
+            )
+        }
+
+        composable(AppDestinations.TUTORIAL_ROUTE) {
+            TutorialScreen(
+                onTutorialFinished = {
+                    Firebase.auth.currentUser?.uid?.let { userId ->
+                        prefs.setTutorialSeen(userId)
+                    }
+                    navController.navigate(AppDestinations.FAMILY_MEMBERS_ROUTE) {
+                        popUpTo(navController.graph.id) { inclusive = true }
                     }
                 }
             )
