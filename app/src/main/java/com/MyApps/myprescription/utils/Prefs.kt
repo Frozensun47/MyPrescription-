@@ -54,6 +54,13 @@ class Prefs(context: Context) {
     fun isFirstRun(): Boolean {
         return sharedPreferences.getBoolean("IS_FIRST_RUN", true)
     }
+    fun isAutoBackupEnabled(): Boolean {
+        return sharedPreferences.getBoolean("AUTO_BACKUP_ENABLED", false)
+    }
+
+    fun setAutoBackupEnabled(enabled: Boolean) {
+        sharedPreferences.edit().putBoolean("AUTO_BACKUP_ENABLED", enabled).apply()
+    }
 
     fun setFirstRun(isFirstRun: Boolean) {
         sharedPreferences.edit().putBoolean("IS_FIRST_RUN", isFirstRun).apply()

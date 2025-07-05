@@ -8,7 +8,6 @@ import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import java.io.File
-import java.io.FileOutputStream
 import java.io.OutputStream
 import java.util.Collections
 
@@ -36,9 +35,9 @@ class GoogleDriveService(context: Context) {
     }
 
     /**
-     * Creates a backup file in the user's appDataFolder on Google Drive.
+     * Creates or updates a backup file in the user's appDataFolder on Google Drive.
      * @param backupFile The local file to be uploaded.
-     * @return The ID of the created file on Google Drive, or null on failure.
+     * @return The ID of the created or updated file on Google Drive, or null on failure.
      */
     fun createBackup(backupFile: File): String? {
         val fileMetadata = com.google.api.services.drive.model.File().apply {
@@ -46,8 +45,18 @@ class GoogleDriveService(context: Context) {
             parents = listOf("appDataFolder")
         }
         val mediaContent = com.google.api.client.http.FileContent("application/zip", backupFile)
-        val file = drive.files().create(fileMetadata, mediaContent).setFields("id").execute()
-        return file.id
+
+        // Check for an existing file to update it, otherwise create a new one.
+        val fileList = drive.files().list().setSpaces("appDataFolder").setQ("name='${fileMetadata.name}'").setFields("files(id)").execute()
+        val existingFile = fileList.files.firstOrNull()
+
+        return if (existingFile != null) {
+            // Update the existing file
+            drive.files().update(existingFile.id, null, mediaContent).execute().id
+        } else {
+            // Create a new file
+            drive.files().create(fileMetadata, mediaContent).setFields("id").execute().id
+        }
     }
 
     /**
@@ -74,5 +83,20 @@ class GoogleDriveService(context: Context) {
      */
     fun restoreBackup(fileId: String, outputStream: OutputStream) {
         drive.files().get(fileId).executeMediaAndDownloadTo(outputStream)
+    }
+
+    /**
+     * Deletes the backup file from the user's appDataFolder.
+     */
+    fun deleteBackup() {
+        val fileId = findBackup()
+        if (fileId != null) {
+            try {
+                drive.files().delete(fileId).execute()
+            } catch (e: Exception) {
+                // It's safe to ignore errors here, as the user is deleting their account anyway
+                e.printStackTrace()
+            }
+        }
     }
 }

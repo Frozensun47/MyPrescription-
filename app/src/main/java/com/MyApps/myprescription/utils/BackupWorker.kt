@@ -9,7 +9,6 @@ import com.MyApps.myprescription.model.BackupData
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -64,10 +63,12 @@ class BackupWorker(appContext: Context, workerParams: WorkerParameters) :
 
         // Create the zip archive with all data
         ZipOutputStream(FileOutputStream(backupFile)).use { zipOut ->
+            // 1. Add the main data file
             zipOut.putNextEntry(java.util.zip.ZipEntry("backup_data.json"))
             zipOut.write(jsonString.toByteArray())
             zipOut.closeEntry()
 
+            // 2. Add all associated images and files
             val allFilePaths = (
                     prescriptions.flatMap { it.imageUri?.split(',') ?: emptyList() } +
                             reports.flatMap { it.fileUri?.split(',') ?: emptyList() } +
@@ -81,6 +82,15 @@ class BackupWorker(appContext: Context, workerParams: WorkerParameters) :
                     file.inputStream().copyTo(zipOut)
                     zipOut.closeEntry()
                 }
+            }
+
+            // 3. Add the settings file
+            val prefsDir = File(applicationContext.applicationInfo.dataDir, "shared_prefs")
+            val prefsFile = File(prefsDir, "MyPrescriptionPrefs.xml")
+            if (prefsFile.exists()) {
+                zipOut.putNextEntry(java.util.zip.ZipEntry("MyPrescriptionPrefs.xml"))
+                prefsFile.inputStream().copyTo(zipOut)
+                zipOut.closeEntry()
             }
         }
         return backupFile

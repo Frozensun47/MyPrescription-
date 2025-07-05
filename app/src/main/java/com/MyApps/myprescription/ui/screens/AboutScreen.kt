@@ -4,6 +4,7 @@ package com.MyApps.myprescription.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -75,6 +76,12 @@ fun AboutScreen(
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                val uriHandler = LocalUriHandler.current
+                OutlinedButton(onClick = { uriHandler.openUri("https://myprescription.myapplications.store/") }) {
+                    Text("Visit our Website")
+                }
             }
 
             item {

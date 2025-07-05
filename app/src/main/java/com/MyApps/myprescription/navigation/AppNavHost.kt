@@ -1,5 +1,6 @@
 package com.MyApps.myprescription.navigation
 
+import android.widget.Toast
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -16,6 +17,7 @@ import com.MyApps.myprescription.ViewModel.FamilyViewModel
 import com.MyApps.myprescription.ViewModel.MemberDetailsViewModel
 import com.MyApps.myprescription.ui.screens.*
 import com.MyApps.myprescription.util.Prefs
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.Dispatchers
@@ -37,7 +39,6 @@ object AppDestinations {
     const val DOCTOR_DETAILS_ROUTE = "doctor_details"
     const val SETTINGS_ROUTE = "settings"
     const val ABOUT_ROUTE = "about"
-    const val HELP_ROUTE = "help"
     const val TERMS_AND_CONDITIONS_ROUTE = "terms_and_conditions"
     const val PRIVACY_POLICY_ROUTE = "privacy_policy"
 
@@ -111,8 +112,6 @@ fun AppNavHost(
                 onPinSet = { pin ->
                     Firebase.auth.currentUser?.uid?.let { userId ->
                         prefs.setPin(userId, pin)
-                        // If the tutorial has already been seen (i.e., changing pin from settings),
-                        // just go back. Otherwise, go to the tutorial.
                         if (prefs.hasSeenTutorial(userId)) {
                             navController.popBackStack()
                         } else {
@@ -135,7 +134,6 @@ fun AppNavHost(
                 onPinEntered = { pin ->
                     Firebase.auth.currentUser?.uid?.let { userId ->
                         if (pin == prefs.getPin(userId)) {
-                            // After correct PIN entry, check if the tutorial has been seen
                             val nextRoute = if (!prefs.hasSeenTutorial(userId)) {
                                 AppDestinations.TUTORIAL_ROUTE
                             } else {
@@ -175,8 +173,6 @@ fun AppNavHost(
                     navController.navigate("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/$memberId/$memberName")
                 },
                 onNavigateToSettings = { navController.navigate(AppDestinations.SETTINGS_ROUTE) },
-                onNavigateToHelp = { navController.navigate(AppDestinations.HELP_ROUTE) },
-                onNavigateToAbout = { navController.navigate(AppDestinations.ABOUT_ROUTE) },
                 onChangeAccountClick = {
                     authViewModel.logout()
                     application.onUserLogout()
@@ -188,52 +184,53 @@ fun AppNavHost(
         composable(AppDestinations.SETTINGS_ROUTE) {
             val authViewModel: AuthViewModel = viewModel()
             val familyViewModel: FamilyViewModel = viewModel(factory = FamilyViewModel.Factory)
-            val firebaseUser by authViewModel.user.collectAsState()
-            val currentUserId = firebaseUser?.uid
 
-            if (currentUserId != null) {
-                SettingsScreen(
-                    userId = currentUserId,
-                    familyViewModel = familyViewModel,
-                    onNavigateUp = { navController.navigateUp() },
-                    onNavigateToChangePin = { navController.navigate(AppDestinations.PIN_SETUP_ROUTE) },
-                    onNavigateToAbout = { navController.navigate(AppDestinations.ABOUT_ROUTE) },
-                    onNavigateToHelp = { navController.navigate(AppDestinations.HELP_ROUTE) },
-                    onNavigateToTerms = { navController.navigate(AppDestinations.TERMS_AND_CONDITIONS_ROUTE) },
-                    onNavigateToPrivacyPolicy = { navController.navigate(AppDestinations.PRIVACY_POLICY_ROUTE) },
-                    onLogout = {
-                        authViewModel.logout()
-                        application.onUserLogout()
-                        navController.navigate(AppDestinations.LOGIN_ROUTE) { popUpTo(navController.graph.startDestinationId) { inclusive = true } }
-                    },
-                    onDeleteAccount = {
-                        coroutineScope.launch {
-                            val userToDelete = Firebase.auth.currentUser
-                            if (userToDelete != null && userToDelete.uid == currentUserId) {
-                                withContext(Dispatchers.IO) {
-                                    application.repository?.clearAllDatabaseTables()
+            SettingsScreen(
+                userId = Firebase.auth.currentUser?.uid ?: "",
+                familyViewModel = familyViewModel,
+                onNavigateUp = { navController.navigateUp() },
+                onNavigateToChangePin = { navController.navigate(AppDestinations.PIN_SETUP_ROUTE) },
+                onNavigateToAbout = { navController.navigate(AppDestinations.ABOUT_ROUTE) },
+                onNavigateToTerms = { navController.navigate(AppDestinations.TERMS_AND_CONDITIONS_ROUTE) },
+                onNavigateToPrivacyPolicy = { navController.navigate(AppDestinations.PRIVACY_POLICY_ROUTE) },
+                onLogout = {
+                    authViewModel.logout()
+                    application.onUserLogout()
+                    navController.navigate(AppDestinations.LOGIN_ROUTE) { popUpTo(navController.graph.startDestinationId) { inclusive = true } }
+                },
+                onDeleteAccount = {
+                    coroutineScope.launch {
+                        val userToDelete = Firebase.auth.currentUser
+                        userToDelete?.delete()?.addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    familyViewModel.deleteAccountAndBackup()
+                                    application.onUserLogout()
+                                    prefs.clearAllData()
                                 }
-                                prefs.clearAllData()
-                                userToDelete.delete().addOnCompleteListener { task ->
-                                    if (task.isSuccessful) {
-                                        authViewModel.logout()
-                                        application.onUserLogout()
-                                        coroutineScope.launch(Dispatchers.Main) {
-                                            navController.navigate(AppDestinations.LOGIN_ROUTE) {
-                                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                                            }
+                                authViewModel.logout()
+                                coroutineScope.launch(Dispatchers.Main) {
+                                    Toast.makeText(context, "Account deleted successfully.", Toast.LENGTH_SHORT).show()
+                                    navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                    }
+                                }
+                            } else {
+                                coroutineScope.launch(Dispatchers.Main) {
+                                    when (task.exception) {
+                                        is FirebaseAuthRecentLoginRequiredException -> {
+                                            Toast.makeText(context, "This is a sensitive operation. Please log out and log in again before deleting your account.", Toast.LENGTH_LONG).show()
+                                        }
+                                        else -> {
+                                            Toast.makeText(context, "Account deletion failed. Please try again.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                )
-            } else {
-                LaunchedEffect(Unit) {
-                    navController.navigate(AppDestinations.LOGIN_ROUTE) { popUpTo(navController.graph.startDestinationId) { inclusive = true } }
                 }
-            }
+            )
         }
 
         composable(AppDestinations.ABOUT_ROUTE) {
@@ -243,7 +240,7 @@ fun AppNavHost(
                 onNavigateToPrivacyPolicy = { navController.navigate(AppDestinations.PRIVACY_POLICY_ROUTE) }
             )
         }
-        composable(AppDestinations.HELP_ROUTE) { HelpScreen(onNavigateUp = { navController.navigateUp() }) }
+
         composable(AppDestinations.TERMS_AND_CONDITIONS_ROUTE) {
             TermsAndConditionsScreen(onNavigateUp = { navController.navigateUp() })
         }
@@ -256,10 +253,7 @@ fun AppNavHost(
             startDestination = AppDestinations.MEMBER_DETAILS_ROUTE
         ) {
             composable(route = AppDestinations.MEMBER_DETAILS_ROUTE) { backStackEntry ->
-                // FIX: Get the ViewModelStoreOwner from the navigation graph's back stack entry
-                val parentEntry = remember(backStackEntry) {
-                    navController.getBackStackEntry(backStackEntry.destination.parent!!.route!!)
-                }
+                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}") }
                 val memberDetailsViewModel: MemberDetailsViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = MemberDetailsViewModel.Factory)
                 val memberId = parentEntry.arguments?.getString(AppDestinations.MEMBER_ID_ARG)
                 val memberName = parentEntry.arguments?.getString(AppDestinations.MEMBER_NAME_ARG)
@@ -288,10 +282,7 @@ fun AppNavHost(
                     navArgument(AppDestinations.DOCUMENT_TITLE_ARG) { type = NavType.StringType }
                 )
             ) { backStackEntry ->
-                // FIX: Get the ViewModelStoreOwner from the navigation graph's back stack entry
-                val parentEntry = remember(backStackEntry) {
-                    navController.getBackStackEntry(backStackEntry.destination.parent!!.route!!)
-                }
+                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}") }
                 val memberDetailsViewModel: MemberDetailsViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = MemberDetailsViewModel.Factory)
                 val documentId = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_ID_ARG)
                 val documentType = backStackEntry.arguments?.getString(AppDestinations.DOCUMENT_TYPE_ARG)
@@ -315,10 +306,7 @@ fun AppNavHost(
                     navArgument(AppDestinations.DOCTOR_NAME_ARG) { type = NavType.StringType }
                 )
             ) { backStackEntry ->
-                // FIX: Get the ViewModelStoreOwner from the navigation graph's back stack entry
-                val parentEntry = remember(backStackEntry) {
-                    navController.getBackStackEntry(backStackEntry.destination.parent!!.route!!)
-                }
+                val parentEntry = remember(backStackEntry) { navController.getBackStackEntry("${AppDestinations.MEMBER_DETAILS_FLOW_ROUTE}/{${AppDestinations.MEMBER_ID_ARG}}/{${AppDestinations.MEMBER_NAME_ARG}}") }
                 val memberDetailsViewModel: MemberDetailsViewModel = viewModel(viewModelStoreOwner = parentEntry, factory = MemberDetailsViewModel.Factory)
                 val doctorId = backStackEntry.arguments?.getString(AppDestinations.DOCTOR_ID_ARG)
                 val doctorName = backStackEntry.arguments?.getString(AppDestinations.DOCTOR_NAME_ARG)?.decodeUri()
