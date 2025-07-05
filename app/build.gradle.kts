@@ -81,6 +81,7 @@ dependencies {
     implementation("com.google.http-client:google-http-client:1.47.1")
     implementation("com.google.android.gms:play-services-auth:21.2.0")
 
+
     // FIX: ADD the new Credential Manager libraries
     implementation("androidx.credentials:credentials:1.2.2")
     implementation("androidx.credentials:credentials-play-services-auth:1.2.2")

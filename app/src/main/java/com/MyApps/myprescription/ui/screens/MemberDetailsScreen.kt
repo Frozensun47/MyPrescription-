@@ -637,16 +637,38 @@ fun AddOrEditPrescriptionDialog(
                     modifier = Modifier.padding(horizontal = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    OutlinedTextField(value = doctorName, onValueChange = { doctorName = it; doctorError = null }, label = { Text("Doctor's Name") }, isError = doctorError != null, supportingText = { if (doctorError != null) Text(doctorError!!) })
                     OutlinedTextField(
-                        value = formatDate(date),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Date and Time") },
-                        trailingIcon = { Icon(Icons.Default.EditCalendar, "Edit Date and Time") },
-                        modifier = Modifier.clickable { showDatePicker = true }
+                        value = doctorName,
+                        onValueChange = { doctorName = it; doctorError = null },
+                        label = { Text("Doctor's Name") },
+                        isError = doctorError != null,
+                        supportingText = { if (doctorError != null) Text(doctorError!!) }
                     )
-                    OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes (Optional)") }, minLines = 3)
+
+                    // Corrected Date/Time Field
+                    Box(modifier = Modifier.clickable { showDatePicker = true }) {
+                        OutlinedTextField(
+                            value = formatDate(date),
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Date and Time") },
+                            trailingIcon = { Icon(Icons.Default.EditCalendar, "Edit Date and Time") },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = false, // Makes it visually clear it's not a standard text input
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        )
+                    }
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text("Notes (Optional)") },
+                        minLines = 3
+                    )
                 }
                 Row(
                     modifier = Modifier
@@ -706,7 +728,6 @@ fun AddOrEditPrescriptionDialog(
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddOrEditReportDialog(
@@ -738,16 +759,38 @@ fun AddOrEditReportDialog(
                     modifier = Modifier.padding(horizontal = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    OutlinedTextField(value = reportName, onValueChange = { reportName = it; nameError = null }, label = { Text("Report Name") }, isError = nameError != null, supportingText = { if (nameError != null) Text(nameError!!) })
                     OutlinedTextField(
-                        value = formatDate(date),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Date and Time") },
-                        trailingIcon = { Icon(Icons.Default.EditCalendar, "Edit Date and Time") },
-                        modifier = Modifier.clickable { showDatePicker = true }
+                        value = reportName,
+                        onValueChange = { reportName = it; nameError = null },
+                        label = { Text("Report Name") },
+                        isError = nameError != null,
+                        supportingText = { if (nameError != null) Text(nameError!!) }
                     )
-                    OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes (Optional)") }, minLines = 3)
+
+                    // Corrected Date/Time Field
+                    Box(modifier = Modifier.clickable { showDatePicker = true }) {
+                        OutlinedTextField(
+                            value = formatDate(date),
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Date and Time") },
+                            trailingIcon = { Icon(Icons.Default.EditCalendar, "Edit Date and Time") },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = false, // Makes it visually clear it's not a standard text input
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        )
+                    }
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text("Notes (Optional)") },
+                        minLines = 3
+                    )
                 }
                 Row(
                     modifier = Modifier
