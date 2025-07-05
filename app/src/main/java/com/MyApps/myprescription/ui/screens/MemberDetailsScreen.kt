@@ -1,6 +1,7 @@
 // frozensun47/myprescription-/MyPrescription--e4ea256193f6bab959107a3c7e7eea1813571356/app/src/main/java/com/MyApps/myprescription/ui/screens/MemberDetailsScreen.kt
 package com.MyApps.myprescription.ui.screens
 
+import android.app.TimePickerDialog
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -313,8 +315,8 @@ fun DoctorCard(
     onCardClick: () -> Unit,
     onAddPrescriptionClick: () -> Unit,
     onAddReportClick: () -> Unit,
-    onDeleteClick: () -> Unit,
-    onEditClick: () -> Unit
+    onDeleteClick: (Doctor) -> Unit,
+    onEditClick: (Doctor) -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -342,14 +344,9 @@ fun DoctorCard(
                         )
                     }
                 }
-                IconButton(onClick = onEditClick) { Icon(Icons.Default.Edit, "Edit Doctor") }
-                IconButton(onClick = onDeleteClick) { Icon(Icons.Default.Delete, "Delete Doctor", tint = MaterialTheme.colorScheme.error) }
+                IconButton(onClick = { onEditClick(doctor) }) { Icon(Icons.Default.Edit, "Edit Doctor") }
+                IconButton(onClick = { onDeleteClick(doctor) }) { Icon(Icons.Default.Delete, "Delete Doctor", tint = MaterialTheme.colorScheme.error) }
             }
-//            Spacer(Modifier.height(16.dp))
-//            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-//                Button(onClick = onAddPrescriptionClick) { Text("Add Prescription") }
-//                OutlinedButton(onClick = onAddReportClick) { Text("Add Report") }
-//            }
         }
     }
 }
@@ -624,7 +621,7 @@ fun AddOrEditPrescriptionDialog(
     val isEditing = prescriptionToEdit != null
 
     var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = MaterialTheme.shapes.large) {
@@ -684,8 +681,20 @@ fun AddOrEditPrescriptionDialog(
                 TextButton(
                     onClick = {
                         showDatePicker = false
-                        showTimePicker = true
                         date = Date(datePickerState.selectedDateMillis ?: date.time)
+                        val calendar = Calendar.getInstance().apply { time = date }
+                        TimePickerDialog(
+                            context,
+                            { _, hourOfDay, minute ->
+                                val cal = Calendar.getInstance().apply { time = date }
+                                cal.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                                cal.set(Calendar.MINUTE, minute)
+                                date = cal.time
+                            },
+                            calendar.get(Calendar.HOUR_OF_DAY),
+                            calendar.get(Calendar.MINUTE),
+                            false
+                        ).show()
                     }
                 ) { Text("OK") }
             },
@@ -695,25 +704,6 @@ fun AddOrEditPrescriptionDialog(
         ) {
             DatePicker(state = datePickerState)
         }
-    }
-
-    if (showTimePicker) {
-        val timePickerState = rememberTimePickerState(
-            initialHour = Calendar.getInstance().apply { time = date }.get(Calendar.HOUR_OF_DAY),
-            initialMinute = Calendar.getInstance().apply { time = date }.get(Calendar.MINUTE)
-        )
-        TimePickerDialog(
-            onDismissRequest = { showTimePicker = false },
-            onConfirm = { hour, minute ->
-                val cal = Calendar.getInstance().apply { time = date }
-                cal.set(Calendar.HOUR_OF_DAY, hour)
-                cal.set(Calendar.MINUTE, minute)
-                date = cal.time
-                showTimePicker = false
-            },
-            initialHour = timePickerState.hour,
-            initialMinute = timePickerState.minute
-        )
     }
 }
 
@@ -731,9 +721,8 @@ fun AddOrEditReportDialog(
     var date by remember(reportToEdit) { mutableStateOf(reportToEdit?.date ?: Date()) }
     var nameError by remember { mutableStateOf<String?>(null) }
     val isEditing = reportToEdit != null
-
     var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = MaterialTheme.shapes.large) {
@@ -793,8 +782,20 @@ fun AddOrEditReportDialog(
                 TextButton(
                     onClick = {
                         showDatePicker = false
-                        showTimePicker = true
                         date = Date(datePickerState.selectedDateMillis ?: date.time)
+                        val calendar = Calendar.getInstance().apply { time = date }
+                        TimePickerDialog(
+                            context,
+                            { _, hourOfDay, minute ->
+                                val cal = Calendar.getInstance().apply { time = date }
+                                cal.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                                cal.set(Calendar.MINUTE, minute)
+                                date = cal.time
+                            },
+                            calendar.get(Calendar.HOUR_OF_DAY),
+                            calendar.get(Calendar.MINUTE),
+                            false
+                        ).show()
                     }
                 ) { Text("OK") }
             },
@@ -803,60 +804,6 @@ fun AddOrEditReportDialog(
             }
         ) {
             DatePicker(state = datePickerState)
-        }
-    }
-
-    if (showTimePicker) {
-        val timePickerState = rememberTimePickerState(
-            initialHour = Calendar.getInstance().apply { time = date }.get(Calendar.HOUR_OF_DAY),
-            initialMinute = Calendar.getInstance().apply { time = date }.get(Calendar.MINUTE)
-        )
-        TimePickerDialog(
-            onDismissRequest = { showTimePicker = false },
-            onConfirm = { hour, minute ->
-                val cal = Calendar.getInstance().apply { time = date }
-                cal.set(Calendar.HOUR_OF_DAY, hour)
-                cal.set(Calendar.MINUTE, minute)
-                date = cal.time
-                showTimePicker = false
-            },
-            initialHour = timePickerState.hour,
-            initialMinute = timePickerState.minute
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun TimePickerDialog(
-    onDismissRequest: () -> Unit,
-    onConfirm: (hour: Int, minute: Int) -> Unit,
-    initialHour: Int,
-    initialMinute: Int
-) {
-    val timePickerState = rememberTimePickerState(
-        initialHour = initialHour,
-        initialMinute = initialMinute
-    )
-
-    Dialog(onDismissRequest = onDismissRequest) {
-        Card {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                TimePicker(state = timePickerState)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismissRequest) { Text("Cancel") }
-                    TextButton(onClick = {
-                        onConfirm(timePickerState.hour, timePickerState.minute)
-                        onDismissRequest()
-                    }) { Text("OK") }
-                }
-            }
         }
     }
 }

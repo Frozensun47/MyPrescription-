@@ -1,3 +1,4 @@
+// frozensun47/myprescription-/MyPrescription--e4ea256193f6bab959107a3c7e7eea1813571356/app/src/main/java/com/MyApps/myprescription/ui/screens/SettingsScreen.kt
 package com.MyApps.myprescription.ui.screens
 
 import android.content.Intent
