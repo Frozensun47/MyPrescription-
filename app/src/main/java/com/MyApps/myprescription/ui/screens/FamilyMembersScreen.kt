@@ -1,6 +1,5 @@
 package com.MyApps.myprescription.ui.screens
 
-import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -57,13 +56,10 @@ fun FamilyMembersScreen(
     authViewModel: AuthViewModel,
     onNavigateToMemberDetails: (memberId: String, memberName: String) -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToHelp: () -> Unit,
-    onNavigateToAbout: () -> Unit,
     onChangeAccountClick: () -> Unit
 ) {
     val members by familyViewModel.members.collectAsState()
-    val isLoading by familyViewModel.isLoading.collectAsState() // Get the new loading state
-
+    val isLoading by familyViewModel.isLoading.collectAsState()
     val showDialog by familyViewModel.showAddMemberDialog.collectAsState()
     val editingMember by familyViewModel.editingMember.collectAsState()
     var memberToDelete by remember { mutableStateOf<Member?>(null) }
@@ -72,13 +68,14 @@ fun FamilyMembersScreen(
     val user by authViewModel.user.collectAsState()
     val context = LocalContext.current
     val prefs = remember { Prefs(context) }
+
     LaunchedEffect(Unit) {
         if (prefs.isFirstRun()) {
             familyViewModel.restoreBackupFromDrive()
             prefs.setFirstRun(false)
         }
     }
-    // ADDED BackHandler
+
     if (drawerState.isOpen) {
         BackHandler {
             scope.launch {
@@ -128,10 +125,8 @@ fun FamilyMembersScreen(
                 }
             }
         ) { paddingValues ->
-            // FIX: Replaced flawed logic with a clear, 3-state check
             when {
                 isLoading -> {
-                    // 1. Loading State
                     LazyColumn(
                         contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = 80.dp, start = 16.dp, end = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -140,11 +135,9 @@ fun FamilyMembersScreen(
                     }
                 }
                 members.isEmpty() -> {
-                    // 2. Empty State
                     EmptyState()
                 }
                 else -> {
-                    // 3. Data Loaded State
                     LazyColumn(
                         modifier = Modifier
                             .padding(paddingValues)

@@ -2,12 +2,14 @@ package com.MyApps.myprescription.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Email
@@ -31,6 +33,7 @@ fun SettingsScreen(
     onNavigateUp: () -> Unit,
     onNavigateToChangePin: () -> Unit,
     onNavigateToAbout: () -> Unit,
+    onNavigateToHelp: () -> Unit,
     onNavigateToTerms: () -> Unit,
     onNavigateToPrivacyPolicy: () -> Unit,
     onLogout: () -> Unit,
@@ -41,11 +44,8 @@ fun SettingsScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showVerifyPinDialog by remember { mutableStateOf(false) }
     var isPinEnabled by remember { mutableStateOf(prefs.isPinEnabled(userId)) }
-
-    // This state now correctly reads from Prefs and will update when the screen is shown
-    var autoBackupEnabled by remember(key1 = Unit) { mutableStateOf(prefs.isAutoBackupEnabled()) }
+    var autoBackupEnabled by remember { mutableStateOf(false) }
     val backupStatus by familyViewModel.backupStatus.collectAsState()
-
 
     Scaffold(
         topBar = {
@@ -77,6 +77,7 @@ fun SettingsScreen(
                                 if (newState) {
                                     onNavigateToChangePin()
                                 } else {
+                                    // You might want to verify PIN before disabling
                                     prefs.setPinEnabled(userId, false)
                                     isPinEnabled = false
                                 }
@@ -100,21 +101,18 @@ fun SettingsScreen(
             item { SettingsSectionTitle("Data Management") }
             item {
                 SettingsItem(
-                    title = "Automatic Cloud Backup",
-                    subtitle = "Backup your data daily to Google Drive",
+                    title = "Automatic Backup",
+                    subtitle = "Backup your data to Google Drive daily",
                     icon = Icons.Default.CloudSync,
                     onClick = {
-                        val newState = !autoBackupEnabled
-                        autoBackupEnabled = newState
-                        prefs.setAutoBackupEnabled(newState)
-                        familyViewModel.setAutoBackupEnabled(newState)
+                        autoBackupEnabled = !autoBackupEnabled
+                        familyViewModel.setAutoBackupEnabled(autoBackupEnabled)
                     },
                     trailingContent = {
                         Switch(
                             checked = autoBackupEnabled,
                             onCheckedChange = {
                                 autoBackupEnabled = it
-                                prefs.setAutoBackupEnabled(it)
                                 familyViewModel.setAutoBackupEnabled(it)
                             }
                         )
@@ -155,15 +153,20 @@ fun SettingsScreen(
                     }
                 )
             }
-            item {
-                SettingsItem(title = "About", icon = Icons.Default.Info, onClick = onNavigateToAbout, isNavigation = true)
-            }
+
             item {
                 SettingsItem(title = "Terms & Conditions", icon = Icons.AutoMirrored.Filled.Article, onClick = onNavigateToTerms, isNavigation = true)
             }
             item {
                 SettingsItem(title = "Privacy Policy", icon = Icons.Default.Policy, onClick = onNavigateToPrivacyPolicy, isNavigation = true)
             }
+            item {
+                SettingsItem(title = "Help", icon = Icons.AutoMirrored.Filled.Help, onClick = onNavigateToHelp, isNavigation = true)
+            }
+            item {
+                SettingsItem(title = "About", icon = Icons.Default.Info, onClick = onNavigateToAbout, isNavigation = true)
+            }
+
 
             item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)) }
 
@@ -177,7 +180,6 @@ fun SettingsScreen(
                     subtitle = "This action is permanent",
                     icon = Icons.Default.DeleteForever,
                     isDestructive = true,
-                    // This now correctly opens the dialog instead of directly deleting
                     onClick = { showDeleteDialog = true }
                 )
             }
@@ -187,7 +189,6 @@ fun SettingsScreen(
     if (showDeleteDialog) {
         DeleteAccountConfirmationDialog(
             onDismiss = { showDeleteDialog = false },
-            // This now calls the onDeleteAccount lambda passed from AppNavHost
             onConfirm = {
                 showDeleteDialog = false
                 onDeleteAccount()
