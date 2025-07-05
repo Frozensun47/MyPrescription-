@@ -11,7 +11,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-
+import com.google.api.services.drive.DriveScopes
+import com.google.android.gms.common.api.Scope;
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val _user = MutableStateFlow<FirebaseUser?>(auth.currentUser)
@@ -30,6 +31,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(application.getString(R.string.default_web_client_id))
             .requestEmail()
+            .requestScopes(Scope(DriveScopes.DRIVE_APPDATA))
             .build()
 
         // Create a GoogleSignInClient

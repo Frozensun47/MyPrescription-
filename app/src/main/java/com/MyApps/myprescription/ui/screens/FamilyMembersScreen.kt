@@ -46,6 +46,7 @@ import com.MyApps.myprescription.ViewModel.FamilyViewModel
 import com.MyApps.myprescription.model.Member
 import com.MyApps.myprescription.ui.components.AppMenuTray
 import com.MyApps.myprescription.ui.components.ShimmerEffect
+import com.MyApps.myprescription.util.Prefs
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -70,7 +71,13 @@ fun FamilyMembersScreen(
     val scope = rememberCoroutineScope()
     val user by authViewModel.user.collectAsState()
     val context = LocalContext.current
-
+    val prefs = remember { Prefs(context) }
+    LaunchedEffect(Unit) {
+        if (prefs.isFirstRun()) {
+            familyViewModel.restoreBackupFromDrive()
+            prefs.setFirstRun(false)
+        }
+    }
     // ADDED BackHandler
     if (drawerState.isOpen) {
         BackHandler {
@@ -92,22 +99,6 @@ fun FamilyMembersScreen(
                 onSettingsClick = {
                     scope.launch { drawerState.close() }
                     onNavigateToSettings()
-                },
-                onFeedbackClick = {
-                    scope.launch { drawerState.close() }
-                    val subject = "MyPrescription Feedback: "
-                    val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
-                        data = Uri.parse("mailto:feedback@myapplications.store?subject=${Uri.encode(subject)}")
-                    }
-                    context.startActivity(Intent.createChooser(emailIntent, "Send feedback"))
-                },
-                onHelpClick = {
-                    scope.launch { drawerState.close() }
-                    onNavigateToHelp()
-                },
-                onAboutClick = {
-                    scope.launch { drawerState.close() }
-                    onNavigateToAbout()
                 }
             )
         }

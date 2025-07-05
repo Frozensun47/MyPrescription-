@@ -66,7 +66,28 @@ fun PrivacyPolicyScreen(
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("Local Data Storage\n")
                     }
-                    append("All data you enter into the App is stored exclusively in a private, secure area on your own device. It is never transmitted to us. This means we cannot see, access, or recover your data.\n\n")
+                    append("All data you enter into the App is stored exclusively in a private, secure area on your own device. It is never transmitted to us.\n\n")
+
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("Sharing Features\n")
+                    }
+                    append("The App allows you to share your (or your family members') medical prescriptions and reports with other individuals (e.g., family members, and potentially doctors in the future) whom you explicitly choose. Please note the following regarding sharing:\n")
+                    append("• ")
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("Direct Device-to-Device Sharing:")
+                    }
+                    append(" This sharing occurs directly between your device and the recipient's device. We DO NOT act as an intermediary server and DO NOT store any of your shared data on our servers. Your medical information is transferred directly from your device to the recipient's device.\n")
+                    append("• ")
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("User Identification (User ID):")
+                    }
+                    append(" To facilitate direct sharing, the App may use a unique ID allocated to each user. This ID is used solely for the purpose of identifying users for direct sharing connections and is NOT linked to any server-side storage of your medical data.\n")
+                    append("• ")
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("Your Responsibility:")
+                    }
+                    append(" You are solely responsible for determining with whom you share your medical information. We have no control over how recipients store, use, or further share the information once it has left your device. Exercise extreme caution and ensure you trust any individual before sharing sensitive medical data with them.\n\n")
+
 
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("Third-Party Services\n")
@@ -87,6 +108,11 @@ fun PrivacyPolicyScreen(
                     append(" All application data, including your family members' details, prescriptions, and reports, will be permanently deleted from your device's internal storage.\n")
                     append("• ")
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("Shared Data (Important):")
+                    }
+                    append(" If you have shared medical information with other users, deleting your data from your device will NOT remove the copies of that data from the devices of the recipients you shared it with. You are responsible for any data once it has been shared.\n")
+                    append("• ")
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("Account Information:")
                     }
                     append(" Your authentication account with Google will be deleted.\n")
@@ -99,7 +125,7 @@ fun PrivacyPolicyScreen(
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("Handling of Children's Information\n")
                     }
-                    append("This App is not directed to children under the age of 13, and the app itself does not knowingly collect or transmit any data. A parent or guardian may choose to enter information about their child into the app for management purposes. In such cases, the parent or guardian is solely responsible for this data, which remains stored only on their device. The user can edit or delete this information at any time.\n\n")
+                    append("This App is not directed to children under the age of 13, and the app itself does not knowingly collect or transmit any data. A parent or guardian may choose to enter information about their child into the app for management purposes. In such cases, the parent or guardian is solely responsible for this data, which remains stored only on their device. If a parent or guardian chooses to share a child's information, they are solely responsible for obtaining all necessary consents and ensuring the sharing is appropriate and lawful.\n\n") // Modified for sharing
 
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("Contact Us\n")

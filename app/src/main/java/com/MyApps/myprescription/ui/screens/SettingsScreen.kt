@@ -1,9 +1,5 @@
-// frozensun47/myprescription-/MyPrescription--81e5414b6e706cfd87c9dd01262402647362da55/app/src/main/java/com/MyApps/myprescription/ui/screens/SettingsScreen.kt
 package com.MyApps.myprescription.ui.screens
 
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,8 +20,10 @@ import androidx.compose.ui.unit.dp
 import com.MyApps.myprescription.ViewModel.FamilyViewModel
 import com.MyApps.myprescription.ui.components.PinInput
 import com.MyApps.myprescription.util.Prefs
-import java.text.SimpleDateFormat
-import java.util.*
+import androidx.compose.material.icons.outlined.Email
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,29 +44,15 @@ fun SettingsScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showVerifyPinDialog by remember { mutableStateOf(false) }
     var isPinEnabled by remember { mutableStateOf(prefs.isPinEnabled(userId)) }
-
-    val backupLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/zip"),
-        onResult = { uri ->
-            uri?.let { familyViewModel.exportBackup(it) }
-                ?: Toast.makeText(context, "Backup cancelled.", Toast.LENGTH_SHORT).show()
-        }
-    )
-
-    val restoreLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-        onResult = { uri ->
-            uri?.let { familyViewModel.importBackup(it) }
-                ?: Toast.makeText(context, "Restore cancelled.", Toast.LENGTH_SHORT).show()
-        }
-    )
+    var autoBackupEnabled by remember { mutableStateOf(false) }
+    val backupStatus by familyViewModel.backupStatus.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Settings") },
                 navigationIcon = { IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
-                colors = TopAppBarDefaults.topAppBarColors( // Added
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
                 )
             )
@@ -117,39 +101,72 @@ fun SettingsScreen(
             item { SettingsSectionTitle("Data Management") }
             item {
                 SettingsItem(
-                    title = "Backup Data",
-                    subtitle = "Save all data to a local .zip file",
-                    icon = Icons.Default.CloudUpload,
+                    title = "Automatic Backup",
+                    subtitle = "Backup your data to Google Drive daily",
+                    icon = Icons.Default.CloudSync,
                     onClick = {
-                        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-                        backupLauncher.launch("MyPrescription_Backup_$timestamp.zip")
+                        autoBackupEnabled = !autoBackupEnabled
+                        familyViewModel.setAutoBackupEnabled(autoBackupEnabled)
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = autoBackupEnabled,
+                            onCheckedChange = {
+                                autoBackupEnabled = it
+                                familyViewModel.setAutoBackupEnabled(it)
+                            }
+                        )
                     }
                 )
             }
             item {
-                SettingsItem(
-                    title = "Restore Data",
-                    subtitle = "Restore data from a backup file",
-                    icon = Icons.Default.CloudDownload,
-                    onClick = { restoreLauncher.launch("*/*") }
-                )
+                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)) {
+                    Text(
+                        text = "Status: $backupStatus",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { familyViewModel.backupNow() },
+                        enabled = autoBackupEnabled
+                    ) {
+                        Text("Backup Now")
+                    }
+                }
             }
+
 
             item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)) }
 
             item { SettingsSectionTitle("Information") }
             item {
-                SettingsItem(title = "About", icon = Icons.Default.Info, onClick = onNavigateToAbout, isNavigation = true)
+                SettingsItem(
+                    title = "Contact & Feedback",
+                    icon = Icons.Outlined.Email,
+                    onClick = {
+                        val subject = "MyPrescription Feedback: "
+                        val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
+                            data = Uri.parse("mailto:feedback@myapplications.store?subject=${Uri.encode(subject)}")
+                        }
+                        context.startActivity(Intent.createChooser(emailIntent, "Send feedback"))
+                    }
+                )
             }
-            item {
-                SettingsItem(title = "Help", icon = Icons.AutoMirrored.Filled.Help, onClick = onNavigateToHelp, isNavigation = true)
-            }
+
             item {
                 SettingsItem(title = "Terms & Conditions", icon = Icons.AutoMirrored.Filled.Article, onClick = onNavigateToTerms, isNavigation = true)
             }
             item {
                 SettingsItem(title = "Privacy Policy", icon = Icons.Default.Policy, onClick = onNavigateToPrivacyPolicy, isNavigation = true)
             }
+            item {
+                SettingsItem(title = "Help", icon = Icons.AutoMirrored.Filled.Help, onClick = onNavigateToHelp, isNavigation = true)
+            }
+            item {
+                SettingsItem(title = "About", icon = Icons.Default.Info, onClick = onNavigateToAbout, isNavigation = true)
+            }
+
 
             item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)) }
 

@@ -6,9 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material.icons.outlined.HelpOutline
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -30,10 +27,7 @@ import com.google.firebase.auth.FirebaseUser
 fun AppMenuTray(
     user: FirebaseUser?,
     onChangeAccountClick: () -> Unit,
-    onSettingsClick: () -> Unit,
-    onHelpClick: () -> Unit,
-    onAboutClick: () -> Unit,
-    onFeedbackClick: () -> Unit
+    onSettingsClick: () -> Unit
 ) {
     ModalDrawerSheet {
         Column(
@@ -97,27 +91,6 @@ fun AppMenuTray(
                     selected = false,
                     onClick = onSettingsClick,
                     icon = { Icon(Icons.Outlined.Settings, contentDescription = "Settings") },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-                NavigationDrawerItem(
-                    label = { Text("Contact & Feedback") },
-                    selected = false,
-                    onClick = onFeedbackClick,
-                    icon = { Icon(Icons.Outlined.Email, contentDescription = "Feedback") },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-                NavigationDrawerItem(
-                    label = { Text("Help") },
-                    selected = false,
-                    onClick = onHelpClick,
-                    icon = { Icon(Icons.Outlined.HelpOutline, contentDescription = "Help") },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-                NavigationDrawerItem(
-                    label = { Text("About") },
-                    selected = false,
-                    onClick = onAboutClick,
-                    icon = { Icon(Icons.Outlined.Info, contentDescription = "About") },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))

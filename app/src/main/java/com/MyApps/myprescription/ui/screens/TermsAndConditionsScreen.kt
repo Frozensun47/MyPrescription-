@@ -73,7 +73,7 @@ fun TermsAndConditionsScreen(
                     }
                     append(" To provide a secure and easy login experience, we use Google Sign-In for authentication. This means your login information (such as your email address and name) is managed by Google. We do not store your password. Your use of Google Sign-In is subject to Google's Terms of Service and Privacy Policy.\n")
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append("Your Responsibility:")
+                        append("Your Responsibility for Data Security:")
                     }
                     append(" Because your data is stored locally, the security of that data is in your hands. You are responsible for keeping your device secure (for example, by using a password or fingerprint lock). If you lose your device or it gets damaged, we cannot recover your data for you.\n\n")
 
@@ -94,23 +94,32 @@ fun TermsAndConditionsScreen(
                     append(" You are responsible for the accuracy and completeness of the information you enter into the App.\n\n")
 
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append("4. Using the App\n")
+                        append("4. Using the App and Data Sharing\n") // Section title updated
                     }
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("License to Use:")
                     }
                     append(" We grant you a limited, non-exclusive, non-transferable, and revocable license to use the App for your own personal, non-commercial use.\n")
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append("Sharing Features:")
+                    }
+                    append(" The App includes features that allow you to directly share medical prescriptions and reports with other individuals (e.g., family members, and potentially doctors) whom you designate using a user-specific ID. You understand and agree that:\n")
+                    append("• This sharing is a direct device-to-device transfer. We DO NOT store, manage, or act as an intermediary for any shared data on our servers.\n")
+                    append("• You are SOLELY RESPONSIBLE for deciding whom to share your sensitive medical information with. We cannot control, monitor, or retrieve data once it has been shared from your device.\n")
+                    append("• You are responsible for ensuring that sharing data (especially that of minors or dependents) complies with all applicable laws and regulations, including obtaining all necessary consents.\n")
+                    append("• The recipient of shared data may store, use, or further share that data, and we bear no responsibility for their actions.\n")
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("Account Deletion:")
                     }
-                    append(" You have the right to delete your account at any time from the 'Settings' screen. Deleting your account is a permanent action that will erase all data stored within the app on your device.\n")
+                    append(" You have the right to delete your account at any time from the 'Settings' screen. Deleting your account is a permanent action that will erase all data stored within the app on your device. HOWEVER, if you have previously shared prescriptions or reports, deleting your account or data from your device will NOT remove copies of that data from the devices of those with whom you shared it.\n") // Modified for sharing
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("What You Cannot Do:")
                     }
                     append(" You agree not to:\n")
                     append("Use the App for any illegal purpose.\n")
                     append("Try to copy, modify, or distribute the App's content without our permission.\n")
-                    append("Attempt to reverse engineer or extract the source code of the App.\n\n")
+                    append("Attempt to reverse engineer or extract the source code of the App.\n")
+                    append("Share false, misleading, or harmful medical information through the App.\n\n") // Added for sharing
 
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("5. No Warranty\n")
@@ -120,7 +129,7 @@ fun TermsAndConditionsScreen(
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("6. Limitation of Liability\n")
                     }
-                    append("To the fullest extent permitted by law in India, the developer of MyPrescription shall not be liable for any direct, indirect, incidental, special, consequential, or punitive damages, or any loss of data, opportunities, reputation, or profits, arising out of your use or inability to use the App. This includes any loss of data from your device.\n\n")
+                    append("To the fullest extent permitted by law in India, the developer of MyPrescription shall not be liable for any direct, indirect, incidental, special, consequential, or punitive damages, or any loss of data, opportunities, reputation, or profits, arising out of your use or inability to use the App, or from any data shared by you through the App. This includes any loss of data from your device.\n\n") // Modified for sharing
 
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
                         append("7. Changes to These Terms\n")

@@ -51,4 +51,11 @@ class Prefs(context: Context) {
     fun clearAllData() {
         sharedPreferences.edit().clear().apply()
     }
+    fun isFirstRun(): Boolean {
+        return sharedPreferences.getBoolean("IS_FIRST_RUN", true)
+    }
+
+    fun setFirstRun(isFirstRun: Boolean) {
+        sharedPreferences.edit().putBoolean("IS_FIRST_RUN", isFirstRun).apply()
+    }
 }

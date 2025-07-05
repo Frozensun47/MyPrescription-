@@ -15,7 +15,7 @@ android {
         applicationId = "com.MyApps.myprescription"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
+        versionCode = 2
         versionName = "22.06.25"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -53,6 +53,7 @@ android {
     packagingOptions { // Added packagingOptions, often needed with multiple libraries
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/DEPENDENCIES"
         }
     }
 }
@@ -71,9 +72,13 @@ dependencies {
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("com.google.api-client:google-api-client-android:1.30.9")
+    implementation("com.google.apis:google-api-services-drive:v3-rev136-1.25.0")
     implementation(platform("com.google.firebase:firebase-bom:33.15.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.http-client:google-http-client-gson:1.47.1")
+    implementation("com.google.http-client:google-http-client:1.47.1")
     implementation("com.google.android.gms:play-services-auth:21.2.0")
 
     // FIX: ADD the new Credential Manager libraries
@@ -88,6 +93,7 @@ dependencies {
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation(libs.googleid)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     // Room Persistence Library
     val roomVersion = "2.6.1" // Ensure this is the latest stable version

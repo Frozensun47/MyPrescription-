@@ -22,6 +22,10 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import androidx.work.*
+import com.MyApps.myprescription.utils.BackupWorker
+import java.util.concurrent.TimeUnit
+import com.MyApps.myprescription.utils.GoogleDriveService
 
 class FamilyViewModel(application: Application, private val repository: AppRepository) : AndroidViewModel(application) {
 
@@ -38,6 +42,9 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
     private val _editingMember = MutableStateFlow<Member?>(null)
     val editingMember: StateFlow<Member?> = _editingMember.asStateFlow()
 
+    private val _backupStatus = MutableStateFlow("Not backed up yet")
+    val backupStatus: StateFlow<String> = _backupStatus.asStateFlow()
+
     // --- Original Functions ---
     fun addMember(memberData: Member, profilePhotoUri: Uri?) {
         viewModelScope.launch {
@@ -52,7 +59,42 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
             _showAddMemberDialog.value = false
         }
     }
+    fun setAutoBackupEnabled(enabled: Boolean) {
+        val workManager = WorkManager.getInstance(getApplication())
+        if (enabled) {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
 
+            val backupRequest = PeriodicWorkRequestBuilder<BackupWorker>(1, TimeUnit.DAYS)
+                .setConstraints(constraints)
+                .build()
+
+            workManager.enqueueUniquePeriodicWork(
+                "daily_backup",
+                ExistingPeriodicWorkPolicy.REPLACE,
+                backupRequest
+            )
+        } else {
+            workManager.cancelUniqueWork("daily_backup")
+        }
+    }
+
+    fun backupNow() {
+        val workManager = WorkManager.getInstance(getApplication())
+        val backupRequest = OneTimeWorkRequestBuilder<BackupWorker>().build()
+        workManager.enqueue(backupRequest)
+
+        workManager.getWorkInfoByIdLiveData(backupRequest.id)
+            .observeForever { workInfo ->
+                when (workInfo.state) {
+                    WorkInfo.State.RUNNING -> _backupStatus.value = "Backing up..."
+                    WorkInfo.State.SUCCEEDED -> _backupStatus.value = "Last backup: Just now"
+                    WorkInfo.State.FAILED -> _backupStatus.value = "Backup failed"
+                    else -> {}
+                }
+            }
+    }
     fun updateMember(memberData: Member, profilePhotoUri: Uri?) {
         viewModelScope.launch {
             var finalMember = memberData
@@ -208,5 +250,52 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
                 return FamilyViewModel(application, repository) as T
             }
         }
+    }
+    private val googleDriveService = GoogleDriveService(application)
+
+    fun exportBackupToDrive() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val backupFile = createBackupFile() // You'll need to create a temporary backup file
+                googleDriveService.createBackup(backupFile)
+                launch(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Backup successful!", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                launch(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Backup failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    fun restoreBackupFromDrive() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val fileId = googleDriveService.findBackup()
+                if (fileId != null) {
+                    val restoreFile = File(getApplication<Application>().cacheDir, "restore.zip")
+                    val outputStream = FileOutputStream(restoreFile)
+                    googleDriveService.restoreBackup(fileId, outputStream)
+                    // Now, you can use the 'restoreFile' with your existing import logic
+                    importBackup(Uri.fromFile(restoreFile))
+                } else {
+                    launch(Dispatchers.Main) {
+                        Toast.makeText(getApplication(), "No backup found.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                launch(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Restore failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private suspend fun createBackupFile(): File {
+        // This is a simplified version of your existing exportBackup logic
+        val backupFile = File(getApplication<Application>().cacheDir, "backup.zip")
+        // ... create the zip file here ...
+        return backupFile
     }
 }
