@@ -1,5 +1,6 @@
 package com.MyApps.myprescription.navigation
 
+import android.widget.Toast
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -16,10 +17,12 @@ import com.MyApps.myprescription.ViewModel.FamilyViewModel
 import com.MyApps.myprescription.ViewModel.MemberDetailsViewModel
 import com.MyApps.myprescription.ui.screens.*
 import com.MyApps.myprescription.util.Prefs
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -205,24 +208,38 @@ fun AppNavHost(
                         coroutineScope.launch {
                             val userToDelete = Firebase.auth.currentUser
                             if (userToDelete != null && userToDelete.uid == currentUserId) {
-                                withContext(Dispatchers.IO) {
-                                    application.repository?.clearAllDatabaseTables()
-                                }
-                                prefs.clearAllData()
-                                userToDelete.delete().addOnCompleteListener { task ->
-                                    if (task.isSuccessful) {
+                                try {
+                                    // These operations are safe to run on a background thread
+                                    familyViewModel.deleteAccountAndBackup()
+                                    prefs.clearAllData()
+                                    userToDelete.delete().await()
+
+                                    // Switch to the main thread for UI operations
+                                    withContext(Dispatchers.Main) {
                                         authViewModel.logout()
                                         application.onUserLogout()
-                                        coroutineScope.launch(Dispatchers.Main) {
+                                        Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_SHORT).show()
+                                        navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        if (e is FirebaseAuthRecentLoginRequiredException) {
+                                            Toast.makeText(context, "Please sign in again to delete your account.", Toast.LENGTH_LONG).show()
+                                            authViewModel.logout()
+                                            application.onUserLogout()
                                             navController.navigate(AppDestinations.LOGIN_ROUTE) {
                                                 popUpTo(navController.graph.startDestinationId) { inclusive = true }
                                             }
+                                        } else {
+                                            Toast.makeText(context, "Error deleting account: ${e.message}", Toast.LENGTH_LONG).show()
                                         }
                                     }
                                 }
                             }
                         }
-                    }
+                    },
                 )
             } else {
                 LaunchedEffect(Unit) {

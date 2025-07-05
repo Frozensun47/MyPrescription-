@@ -20,6 +20,7 @@ import com.MyApps.myprescription.utils.BackupWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
@@ -77,8 +78,8 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
             _showAddMemberDialog.value = false
         }
     }
-    fun deleteAccountAndBackup() {
-        viewModelScope.launch(Dispatchers.IO) {
+    suspend fun deleteAccountAndBackup() {
+        withContext(Dispatchers.IO) {
             // 1. Delete the Google Drive backup
             try {
                 googleDriveService.deleteBackup()
@@ -241,7 +242,7 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
                     }
                 }
                 launch(Dispatchers.Main) {
-                    Toast.makeText(getApplication(), "Restore successful! Please restart the app.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(getApplication(), "Data Restored", Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
                 launch(Dispatchers.Main) {
