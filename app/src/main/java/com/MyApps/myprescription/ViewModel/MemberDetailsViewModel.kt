@@ -1,3 +1,4 @@
+// frozensun47/myprescription-/MyPrescription--e4ea256193f6bab959107a3c7e7eea1813571356/app/src/main/java/com/MyApps/myprescription/ViewModel/MemberDetailsViewModel.kt
 package com.MyApps.myprescription.ViewModel
 
 import android.app.Application
@@ -109,10 +110,10 @@ class MemberDetailsViewModel(application: Application, private val repository: A
             targetDoctorForAttachment.value = null
         }
     }
-    fun updatePrescriptionDetails(id: String, doctorName: String, notes: String) {
+    fun updatePrescriptionDetails(id: String, doctorName: String, notes: String, date: Date) {
         viewModelScope.launch {
             val prescription = allPrescriptions.value.find { it.id == id } ?: return@launch
-            val updatedPrescription = prescription.copy(doctorName = doctorName, notes = notes.ifBlank { null })
+            val updatedPrescription = prescription.copy(doctorName = doctorName, notes = notes.ifBlank { null }, date = date)
             repository.updatePrescription(updatedPrescription)
         }
     }
@@ -142,10 +143,10 @@ class MemberDetailsViewModel(application: Application, private val repository: A
             targetDoctorForAttachment.value = null
         }
     }
-    fun updateReportDetails(id: String, reportName: String, notes: String) {
+    fun updateReportDetails(id: String, reportName: String, notes: String, date: Date) {
         viewModelScope.launch {
             val report = allReports.value.find { it.id == id } ?: return@launch
-            val updatedReport = report.copy(reportName = reportName, notes = notes.ifBlank { null })
+            val updatedReport = report.copy(reportName = reportName, notes = notes.ifBlank { null }, date = date)
             repository.updateReport(updatedReport)
         }
     }

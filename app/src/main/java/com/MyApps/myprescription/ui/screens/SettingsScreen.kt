@@ -44,7 +44,7 @@ fun SettingsScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showVerifyPinDialog by remember { mutableStateOf(false) }
     var isPinEnabled by remember { mutableStateOf(prefs.isPinEnabled(userId)) }
-    var autoBackupEnabled by remember { mutableStateOf(false) }
+    var autoBackupEnabled by remember { mutableStateOf(prefs.isAutoBackupEnabled()) }
     val backupStatus by familyViewModel.backupStatus.collectAsState()
 
     Scaffold(

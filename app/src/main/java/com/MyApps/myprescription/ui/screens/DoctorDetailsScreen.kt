@@ -1,3 +1,4 @@
+// frozensun47/myprescription-/MyPrescription--e4ea256193f6bab959107a3c7e7eea1813571356/app/src/main/java/com/MyApps/myprescription/ui/screens/DoctorDetailsScreen.kt
 package com.MyApps.myprescription.ui.screens
 
 import android.net.Uri
@@ -160,7 +161,7 @@ fun DoctorDetailsScreen(
             prescriptionToEdit = editingPrescription,
             onDismiss = { memberDetailsViewModel.onDismissDialogs() },
             onAdd = { memberDetailsViewModel.addPrescription(it) },
-            onUpdate = { id, doc, notes -> memberDetailsViewModel.updatePrescriptionDetails(id, doc, notes) }
+            onUpdate = { id, doc, notes, date -> memberDetailsViewModel.updatePrescriptionDetails(id, doc, notes, date) }
         )
     }
 
@@ -170,7 +171,7 @@ fun DoctorDetailsScreen(
             reportToEdit = editingReport,
             onDismiss = { memberDetailsViewModel.onDismissDialogs() },
             onAdd = { memberDetailsViewModel.addReport(it) },
-            onUpdate = { id, name, notes -> memberDetailsViewModel.updateReportDetails(id, name, notes) }
+            onUpdate = { id, name, notes, date -> memberDetailsViewModel.updateReportDetails(id, name, notes, date) }
         )
     }
 }

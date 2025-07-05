@@ -1,3 +1,4 @@
+// frozensun47/myprescription-/MyPrescription--e4ea256193f6bab959107a3c7e7eea1813571356/app/src/main/java/com/MyApps/myprescription/ViewModel/FamilyViewModel.kt
 package com.MyApps.myprescription.ViewModel
 
 import android.app.Application
@@ -65,13 +66,11 @@ class FamilyViewModel(application: Application, private val repository: AppRepos
     fun updateMember(memberData: Member, profilePhotoUri: Uri?) {
         viewModelScope.launch {
             var finalMember = memberData
-            if (profilePhotoUri != null && profilePhotoUri.toString() != memberData.profileImageUri) {
+            if (profilePhotoUri != null) {
                 val imagePath = saveFileToInternalStorage(getApplication(), profilePhotoUri, "profile")
                 if (imagePath.isNotBlank()) {
                     finalMember = memberData.copy(profileImageUri = imagePath)
                 }
-            } else if (profilePhotoUri == null && memberData.profileImageUri != null) {
-                finalMember = memberData.copy(profileImageUri = null)
             }
             repository.updateMember(finalMember)
             _editingMember.value = null

@@ -1,4 +1,4 @@
-// frozensun47/myprescription-/MyPrescription--81e5414b6e706cfd87c9dd01262402647362da55/app/src/main/java/com/MyApps/myprescription/ui/screens/MemberDetailsScreen.kt
+// frozensun47/myprescription-/MyPrescription--e4ea256193f6bab959107a3c7e7eea1813571356/app/src/main/java/com/MyApps/myprescription/ui/screens/MemberDetailsScreen.kt
 package com.MyApps.myprescription.ui.screens
 
 import android.net.Uri
@@ -191,7 +191,7 @@ fun MemberDetailsScreen(
             prescriptionToEdit = editingPrescription,
             onDismiss = { memberDetailsViewModel.onDismissDialogs() },
             onAdd = { memberDetailsViewModel.addPrescription(it) },
-            onUpdate = { id, doc, notes -> memberDetailsViewModel.updatePrescriptionDetails(id, doc, notes) }
+            onUpdate = { id, doc, notes, date -> memberDetailsViewModel.updatePrescriptionDetails(id, doc, notes, date) }
         )
     }
 
@@ -201,7 +201,7 @@ fun MemberDetailsScreen(
             reportToEdit = editingReport,
             onDismiss = { memberDetailsViewModel.onDismissDialogs() },
             onAdd = { memberDetailsViewModel.addReport(it) },
-            onUpdate = { id, name, notes -> memberDetailsViewModel.updateReportDetails(id, name, notes) }
+            onUpdate = { id, name, notes, date -> memberDetailsViewModel.updateReportDetails(id, name, notes, date) }
         )
     }
 
@@ -608,18 +608,23 @@ fun AddOrEditDoctorDialog(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddOrEditPrescriptionDialog(
     memberId: String,
     prescriptionToEdit: Prescription? = null,
     onDismiss: () -> Unit,
     onAdd: (Prescription) -> Unit = {},
-    onUpdate: (id: String, doctorName: String, notes: String) -> Unit = { _, _, _ -> }
+    onUpdate: (id: String, doctorName: String, notes: String, date: Date) -> Unit = { _, _, _, _ -> }
 ) {
     var doctorName by remember { mutableStateOf(prescriptionToEdit?.doctorName ?: "") }
     var notes by remember { mutableStateOf(prescriptionToEdit?.notes ?: "") }
+    var date by remember(prescriptionToEdit) { mutableStateOf(prescriptionToEdit?.date ?: Date()) }
     var doctorError by remember { mutableStateOf<String?>(null) }
     val isEditing = prescriptionToEdit != null
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = MaterialTheme.shapes.large) {
@@ -636,6 +641,14 @@ fun AddOrEditPrescriptionDialog(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     OutlinedTextField(value = doctorName, onValueChange = { doctorName = it; doctorError = null }, label = { Text("Doctor's Name") }, isError = doctorError != null, supportingText = { if (doctorError != null) Text(doctorError!!) })
+                    OutlinedTextField(
+                        value = formatDate(date),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Date and Time") },
+                        trailingIcon = { Icon(Icons.Default.EditCalendar, "Edit Date and Time") },
+                        modifier = Modifier.clickable { showDatePicker = true }
+                    )
                     OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes (Optional)") }, minLines = 3)
                 }
                 Row(
@@ -651,9 +664,9 @@ fun AddOrEditPrescriptionDialog(
                             doctorError = "Doctor's name cannot be empty"
                         } else {
                             if (isEditing) {
-                                onUpdate(prescriptionToEdit!!.id, doctorName.trim(), notes.trim())
+                                onUpdate(prescriptionToEdit!!.id, doctorName.trim(), notes.trim(), date)
                             } else {
-                                onAdd(Prescription(memberId = memberId, doctorName = doctorName.trim(), date = Date(), notes = notes.trim().ifBlank { null }, doctorId = null))
+                                onAdd(Prescription(memberId = memberId, doctorName = doctorName.trim(), date = date, notes = notes.trim().ifBlank { null }, doctorId = null))
                             }
                             onDismiss()
                         }
@@ -662,20 +675,65 @@ fun AddOrEditPrescriptionDialog(
             }
         }
     }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = date.time)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDatePicker = false
+                        showTimePicker = true
+                        date = Date(datePickerState.selectedDateMillis ?: date.time)
+                    }
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = Calendar.getInstance().apply { time = date }.get(Calendar.HOUR_OF_DAY),
+            initialMinute = Calendar.getInstance().apply { time = date }.get(Calendar.MINUTE)
+        )
+        TimePickerDialog(
+            onDismissRequest = { showTimePicker = false },
+            onConfirm = { hour, minute ->
+                val cal = Calendar.getInstance().apply { time = date }
+                cal.set(Calendar.HOUR_OF_DAY, hour)
+                cal.set(Calendar.MINUTE, minute)
+                date = cal.time
+                showTimePicker = false
+            },
+            initialHour = timePickerState.hour,
+            initialMinute = timePickerState.minute
+        )
+    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddOrEditReportDialog(
     memberId: String,
     reportToEdit: Report? = null,
     onDismiss: () -> Unit,
     onAdd: (Report) -> Unit = {},
-    onUpdate: (id: String, name: String, notes: String) -> Unit = { _, _, _ -> }
+    onUpdate: (id: String, name: String, notes: String, date: Date) -> Unit = { _, _, _, _ -> }
 ) {
     var reportName by remember { mutableStateOf(reportToEdit?.reportName ?: "") }
     var notes by remember { mutableStateOf(reportToEdit?.notes ?: "") }
+    var date by remember(reportToEdit) { mutableStateOf(reportToEdit?.date ?: Date()) }
     var nameError by remember { mutableStateOf<String?>(null) }
     val isEditing = reportToEdit != null
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = MaterialTheme.shapes.large) {
@@ -692,6 +750,14 @@ fun AddOrEditReportDialog(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     OutlinedTextField(value = reportName, onValueChange = { reportName = it; nameError = null }, label = { Text("Report Name") }, isError = nameError != null, supportingText = { if (nameError != null) Text(nameError!!) })
+                    OutlinedTextField(
+                        value = formatDate(date),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Date and Time") },
+                        trailingIcon = { Icon(Icons.Default.EditCalendar, "Edit Date and Time") },
+                        modifier = Modifier.clickable { showDatePicker = true }
+                    )
                     OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes (Optional)") }, minLines = 3)
                 }
                 Row(
@@ -707,13 +773,88 @@ fun AddOrEditReportDialog(
                             nameError = "Report name cannot be empty"
                         } else {
                             if (isEditing) {
-                                onUpdate(reportToEdit!!.id, reportName.trim(), notes.trim())
+                                onUpdate(reportToEdit!!.id, reportName.trim(), notes.trim(), date)
                             } else {
-                                onAdd(Report(memberId = memberId, reportName = reportName.trim(), date = Date(), notes = notes.trim().ifBlank { null }, doctorId = null))
+                                onAdd(Report(memberId = memberId, reportName = reportName.trim(), date = date, notes = notes.trim().ifBlank { null }, doctorId = null))
                             }
                             onDismiss()
                         }
                     }) { Text(if (isEditing) "Save Changes" else "Add") }
+                }
+            }
+        }
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = date.time)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDatePicker = false
+                        showTimePicker = true
+                        date = Date(datePickerState.selectedDateMillis ?: date.time)
+                    }
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = Calendar.getInstance().apply { time = date }.get(Calendar.HOUR_OF_DAY),
+            initialMinute = Calendar.getInstance().apply { time = date }.get(Calendar.MINUTE)
+        )
+        TimePickerDialog(
+            onDismissRequest = { showTimePicker = false },
+            onConfirm = { hour, minute ->
+                val cal = Calendar.getInstance().apply { time = date }
+                cal.set(Calendar.HOUR_OF_DAY, hour)
+                cal.set(Calendar.MINUTE, minute)
+                date = cal.time
+                showTimePicker = false
+            },
+            initialHour = timePickerState.hour,
+            initialMinute = timePickerState.minute
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TimePickerDialog(
+    onDismissRequest: () -> Unit,
+    onConfirm: (hour: Int, minute: Int) -> Unit,
+    initialHour: Int,
+    initialMinute: Int
+) {
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute
+    )
+
+    Dialog(onDismissRequest = onDismissRequest) {
+        Card {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                TimePicker(state = timePickerState)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismissRequest) { Text("Cancel") }
+                    TextButton(onClick = {
+                        onConfirm(timePickerState.hour, timePickerState.minute)
+                        onDismissRequest()
+                    }) { Text("OK") }
                 }
             }
         }

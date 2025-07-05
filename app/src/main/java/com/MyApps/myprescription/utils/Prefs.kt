@@ -1,19 +1,38 @@
+// frozensun47/myprescription-/MyPrescription--e4ea256193f6bab959107a3c7e7eea1813571356/app/src/main/java/com/MyApps/myprescription/util/Prefs.kt
 package com.MyApps.myprescription.util
 
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import java.io.IOException
+import java.security.GeneralSecurityException
 
 class Prefs(context: Context) {
     private val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
 
-    private val sharedPreferences = EncryptedSharedPreferences.create(
-        "MyPrescriptionPrefs",
-        masterKeyAlias,
-        context,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val sharedPreferences = try {
+        EncryptedSharedPreferences.create(
+            "MyPrescriptionPrefs",
+            masterKeyAlias,
+            context,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: GeneralSecurityException) {
+        // This can happen if the master key is recreated, for example, after a reinstall.
+        // In this case, we clear the old preferences and start fresh.
+        context.getSharedPreferences("MyPrescriptionPrefs", Context.MODE_PRIVATE).edit().clear().apply()
+        EncryptedSharedPreferences.create(
+            "MyPrescriptionPrefs",
+            masterKeyAlias,
+            context,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: IOException) {
+        throw IOException("Could not create EncryptedSharedPreferences", e)
+    }
+
 
     // --- Add these new functions ---
     fun hasSeenTutorial(userId: String): Boolean {
